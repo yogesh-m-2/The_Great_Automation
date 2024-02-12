@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - The Great Automation</title>
+    <style>
+        /* Add your CSS styles here */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h2 {
+            margin-top: 0;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .status {
+            text-align: center;
+        }
+        .status.running {
+            color: green;
+        }
+        .status.paused {
+            color: orange;
+        }
+        .status.stopped {
+            color: red;
+        }
+        .cpu-usage {
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Task List</h2>
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>CPU Usage (%)</th>
+            </tr>
+            {% for task in tasks %}
+            <tr>
+                <td>{{ task.id }}</td>
+                <td>{{ task.name }}</td>
+                <td class="status {{ task.status.lower() }}">{{ task.status }}</td>
+                <td class="cpu-usage" id="cpu-usage-{{ task.id }}">Loading...</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    
+    <script>
+       const fs = require('fs');
+
+// Read file synchronously
+try {
+  const data = fs.readFileSync('tasks.csv', 'utf8');
+  console.log(data);
+} catch (err) {
+  console.error('Error reading the file:', err);
+}
+    </script>
+</body>
+</html>

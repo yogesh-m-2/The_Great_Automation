@@ -7,7 +7,35 @@ import json
 import time
 
 app = Flask(__name__)
+threads = []
+thread_dict={}
+count=0
 app.secret_key = "your_secret_key"
+
+class MyThread(threading.Thread):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+        self._stop_event = threading.Event()
+        self._pause_event = threading.Event()
+        self._pause_event.set()
+
+    def run(self):
+        task=load_tasks()
+        try:
+            subprocess.run(["python", code_path], check=True)
+        except subprocess.CalledProcessError:
+            task['status'] = 'Stopped'
+            save_tasks(tasks)
+
+    def stop(self):
+        self._stop_event.set()
+
+    def pause(self):
+        self._pause_event.clear()
+
+    def resume(self):
+        self._pause_event.set()
 
 # Function to load tasks from CSV
 def load_tasks():
@@ -21,7 +49,7 @@ def load_tasks():
 # Function to save tasks to CSV
 def save_tasks(tasks):
     with open('tasks.csv', 'w', newline='') as file:
-        fieldnames = ['id', 'name', 'status', 'code_path']
+        fieldnames = ['id', 'name', 'status', 'code','cpu_usage']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(tasks)
@@ -74,18 +102,25 @@ def start_task(task_id):
             if int(task['id']) == task_id:
                 task['status'] = 'Running'
                 save_tasks(tasks)
-                code_path = task.get('code_path')
-                if code_path and os.path.isfile(code_path):
-                    # Execute Python code associated with the task
-                    try:
-                        subprocess.run(["python", code_path], check=True)
-                    except subprocess.CalledProcessError:
-                        task['status'] = 'Stopped'
-                        save_tasks(tasks)
+                code_path = f'code_{task_id}'
+                code=task.get('code')
+                if os.path.exists(code_path):
+                    print(f"The file '{code_path}' already exists.")
                 else:
+                    with open(code_path, 'w') as f:
+                        print(f"The file '{code_path}' doesn't exist. Creating it now.")
+                        f.write(code)
+                        print(f"The file '{code_path}' has been created.")
+            if os.path.isfile(code_path):
+                thread = MyThread(f"code_path")
+                threads.append(thread)
+                thread_dict[code_path] = count
+                count=count+1
+                thread.start()
+            else:
                     task['status'] = 'Stopped'
                     save_tasks(tasks)
-                break
+            break
         return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
 
@@ -94,9 +129,11 @@ def start_task(task_id):
 def stop_task(task_id):
     if 'username' in session:
         tasks = load_tasks()
+        code_path = f"code_{task_id}"
         for task in tasks:
             if int(task['id']) == task_id:
                 task['status'] = 'Stopped'
+                threads[thread_dict[code_path]].stop()
                 save_tasks(tasks)
                 break
         return redirect(url_for('dashboard'))
@@ -110,12 +147,8 @@ def edit_task(task_id):
         tasks = load_tasks()
         for task in tasks:
             if int(task['id']) == task_id:
-                code_path = task.get('code_path')  # Check if code_path exists
-                if code_path and os.path.isfile(code_path):  # Check if code_path is valid
-                    code = load_code(code_path)
-                    return render_template('editor.html', task=task, code=code)
-                else:
-                    return render_template('editor.html', task=task)
+                code = task.get('code')  # Check if code_path exists
+                return render_template('editor.html', task=task, code=code)              
     return redirect(url_for('dashboard'))
 
 # Save code
@@ -126,12 +159,16 @@ def save_code(task_id):
         for task in tasks:
             if int(task['id']) == task_id:
                 code = request.form['code']
-                code_path = task['code_path']
-                with open(code_path, 'w') as file:
-                    file.write(code)
+                task['code'] = code  # Update the 'code' field in the task dictionary
+                with open('tasks.csv', 'w', newline='') as csvfile:
+                    fieldnames = ['id', 'name', 'status', 'code','cpu_usage']  # Adjust according to your CSV
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerow(task)  # Append the updated task to the CSV file
                 break
         return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
+
 def update_cpu_usage():
     while True:
         tasks = load_tasks()
@@ -146,6 +183,6 @@ if __name__ == '__main__':
     import threading
     update_cpu_thread = threading.Thread(target=update_cpu_usage)
     update_cpu_thread.daemon = True
-    update_cpu_thread.start()
+    # update_cpu_thread.start()
 
     app.run(debug=True)

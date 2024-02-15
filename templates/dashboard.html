@@ -46,9 +46,37 @@
         .status.stopped {
             color: red;
         }
-        .cpu-usage {
-            text-align: center;
-            font-weight: bold;
+        .btn-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .btn {
+            margin: 0 5px;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn.start {
+            background-color: green;
+            color: white;
+        }
+        .btn.pause {
+            background-color: orange;
+            color: white;
+        }
+        .btn.stop {
+            background-color: red;
+            color: white;
+        }
+        .btn.restart {
+            background-color: blue;
+            color: white;
+        }
+        .btn.code {
+            background-color: #007bff;
+            color: white;
         }
     </style>
 </head>
@@ -60,29 +88,33 @@
                 <th>ID</th>
                 <th>Name</th>
                 <th>Status</th>
-                <th>CPU Usage (%)</th>
+                <th>Action</th>
             </tr>
             {% for task in tasks %}
             <tr>
                 <td>{{ task.id }}</td>
                 <td>{{ task.name }}</td>
                 <td class="status {{ task.status.lower() }}">{{ task.status }}</td>
-                <td class="cpu-usage" id="cpu-usage-{{ task.id }}">Loading...</td>
+                <td class="btn-group">
+                    <form action="/start/{{ task.id }}" method="GET">
+                        <button class="btn start">&#9654;</button>
+                    </form>
+                    <form action="/pause/{{ task.id }}" method="GET">
+                        <button class="btn pause">&#10073;&#10073;</button>
+                    </form>
+                    <form action="/stop/{{ task.id }}" method="GET">
+                        <button class="btn stop">&#9724;</button>
+                    </form>
+                    <form action="/restart/{{ task.id }}" method="GET">
+                        <button class="btn restart">&#8634;</button>
+                    </form>
+                    <form action="/edit/{{ task.id }}" method="GET">
+                        <button class="btn code">Edit Code</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </table>
     </div>
-    
-    <script>
-       const fs = require('fs');
-
-// Read file synchronously
-try {
-  const data = fs.readFileSync('tasks.csv', 'utf8');
-  console.log(data);
-} catch (err) {
-  console.error('Error reading the file:', err);
-}
-    </script>
 </body>
 </html>

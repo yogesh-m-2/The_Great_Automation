@@ -1,13 +1,7 @@
-import time
-
-def main():
-    # Start time
-    start_time = time.time()
-
-    # Run for 5 seconds
-    while time.time() - start_time < 5:
-        # Your code here
-        pass
-
-if __name__ == "__main__":
-    main()
+import os
+# Delete all files with names starting with 'abc'
+for i in range(1, 50):
+    filename = f'abc{i}.txt'
+    if os.path.exists(filename):
+        os.remove(filename)
+print("Files deleted successfully.")

@@ -1,2 +1,9 @@
 id,name,status,code,cpu_usage
-1,wded,Stopped,gggj,75.4
+1,wded,Stopped,"import os
+# Delete all files with names starting with 'abc'
+for i in range(1, 50):
+    filename = f'abc{i}.txt'
+    if os.path.exists(filename):
+        os.remove(filename)
+print(""Files deleted successfully."")
+",28.7

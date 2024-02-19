@@ -15,11 +15,11 @@ count=0
 app.secret_key = "your_secret_key"
 
 class MyThread(threading.Thread):
-    def __init__(self, task_id):
+    def __init__(self, task_id,code):
         super(MyThread, self).__init__()
         self.task_id = task_id
         self.stop_event = threading.Event()
-        self.pro = None
+        self.code = code
         
 
     # def __init__(self, name,tasks,task):
@@ -36,12 +36,10 @@ class MyThread(threading.Thread):
         code_path = f'code_{self.task_id}.py'
         cmd = "python "+str(code_path)
         print(cmd)
-        while not self.stop_event.is_set():
-            try:
-                self.pro = subprocess.Popen(cmd, stdout=subprocess.PIPE, 
-                       shell=True) 
-            except:
-                pass
+        try:
+            exec(self.code,{'stop_event': self.stop_event})
+        except:
+            pass
         print("trying to terminate")
 
     # def run(self):
@@ -52,10 +50,13 @@ class MyThread(threading.Thread):
     #     except subprocess.CalledProcessError:
     #         self.task['status'] = 'Stopped'
     #         save_tasks(self.tasks)
+
+    def getpid(self):
+        pid = os.getpid()
+        return pid
             
     def stop(self):
-        print("here")
-        print(self.pro.pid)
+        print("stopping thread")
         self.stop_event.set()
 
     # def stop(self):
@@ -79,7 +80,7 @@ def load_tasks():
 # Function to save tasks to CSV
 def save_tasks(tasks):
     with open('tasks.csv', 'w', newline='') as file:
-        fieldnames = ['id', 'name', 'status', 'code','cpu_usage']
+        fieldnames = ['id', 'name', 'status','pid', 'code','cpu_usage']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(tasks)
@@ -146,7 +147,14 @@ def start_task(task_id):
     #                 break
     #         return redirect(url_for('dashboard'))
     # return redirect(url_for('signin'))
-    thread = MyThread(task_id)
+    tasks = load_tasks()
+    for task in tasks:
+        if int(task['id']) == task_id:
+            task['status'] = 'Running'
+            (tasks)
+            code_path = f'code_{task_id}.py'
+            code = task.get('code')
+    thread = MyThread(task_id,code)
     thread.start()
     return "Task started"
 
@@ -197,7 +205,7 @@ def save_code(task_id):
                 code = request.form['code']
                 task['code'] = code  # Update the 'code' field in the task dictionary
                 with open('tasks.csv', 'w', newline='') as csvfile:
-                    fieldnames = ['id', 'name', 'status', 'code','cpu_usage']  # Adjust according to your CSV
+                    fieldnames = ['id', 'name', 'status','pid', 'code','cpu_usage']  # Adjust according to your CSV
                     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     writer.writeheader()
                     writer.writerow(task)  # Append the updated task to the CSV file

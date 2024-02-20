@@ -21,16 +21,6 @@ class MyThread(threading.Thread):
         self.stop_event = threading.Event()
         self.code = code
         
-
-    # def __init__(self, name,tasks,task):
-    #     super(MyThread, self).__init__()
-    #     self.tasks = tasks
-    #     self.task = task
-    #     self.name = name
-    #     self.task_id= name
-    #     self._stop_event = threading.Event()
-    #     self._pause_event = threading.Event()
-    #     self._pause_event.set()
     
     def run(self):
         code_path = f'code_{self.task_id}.py'
@@ -40,27 +30,16 @@ class MyThread(threading.Thread):
             exec(self.code,{'stop_event': self.stop_event})
         except:
             pass
+        tasks=load_tasks()
+        for task in tasks:
+            if int(task['id']) == self.task_id:
+                task['status'] = 'Stopped'
+                save_tasks(tasks)
         print("trying to terminate")
-
-    # def run(self):
-    #     try:
-    #         subprocess.run(["python", self.name], check=True)
-    #         self.task['status'] = 'Stopped'
-    #         save_tasks(self.tasks)
-    #     except subprocess.CalledProcessError:
-    #         self.task['status'] = 'Stopped'
-    #         save_tasks(self.tasks)
-
-    def getpid(self):
-        pid = os.getpid()
-        return pid
             
     def stop(self):
         print("stopping thread")
         self.stop_event.set()
-
-    # def stop(self):
-    #     self._stop_event.set()
 
     def pause(self):
         self._pause_event.clear()
@@ -127,61 +106,33 @@ def cpu_usage():
 # Start task
 @app.route('/start/<int:task_id>')
 def start_task(task_id):
-    # if 'username' in session:
-    #         tasks = load_tasks()
-    #         for task in tasks:
-    #             if int(task['id']) == task_id:
-    #                 task['status'] = 'Running'
-    #                 save_tasks(tasks)
-    #                 code_path = f'code_{task_id}.py'
-    #                 code = task.get('code')
-    #                 with open(code_path, 'w') as f:
-    #                     f.write(code)
-    #                     print(f"The file '{code_path}' has been created/updated.")
-    #                 if os.path.isfile(code_path):
-    #                     thread = MyThread(code_path, task, tasks)
-    #                     thread.start()
-    #                 else:
-    #                     task['status'] = 'Stopped'
-    #                     save_tasks(tasks)
-    #                 break
-    #         return redirect(url_for('dashboard'))
-    # return redirect(url_for('signin'))
-    tasks = load_tasks()
-    for task in tasks:
-        if int(task['id']) == task_id:
-            task['status'] = 'Running'
-            (tasks)
-            code_path = f'code_{task_id}.py'
-            code = task.get('code')
-    thread = MyThread(task_id,code)
-    thread.start()
-    return "Task started"
+    if 'username' in session:
+        tasks = load_tasks()
+        for task in tasks:
+            if int(task['id']) == task_id:
+                task['status'] = 'Running'
+                code = task.get('code')
+                thread = MyThread(task_id,code)
+                thread.start()
+                save_tasks(tasks)
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('signin'))
 
 # Stop task
 @app.route('/stop/<int:task_id>')
 def stop_task(task_id):
-    for thread in threading.enumerate():
-        print(thread.__class__.__name__)
-        if isinstance(thread, MyThread) and thread.task_id == task_id:
-            thread.stop()
-            return f"Task {task_id} stopped"
-    return f"Task {task_id} not found"
-
-    # if 'username' in session:
-    #     tasks = load_tasks()
-    #     code_path = f"code_{task_id}"
-    #     for task in tasks:
-    #         if int(task['id']) == task_id:
-    #             task['status'] = 'Stopped'
-    #             for thread in threading.enumerate():
-    #                 print(thread)
-    #                 if isinstance(thread, MyThread) and thread.task_id == code_path:
-    #                     thread.stop()
-    #             save_tasks(tasks)
-    #             break
-    #     return redirect(url_for('dashboard'))
-    # return redirect(url_for('signin'))
+    if 'username' in session:
+        for thread in threading.enumerate():
+            if isinstance(thread, MyThread) and thread.task_id == task_id:
+                thread.stop()
+                tasks = load_tasks()
+                for task in tasks:
+                    if int(task['id']) == task_id:
+                        task['status'] = 'Stopped'
+                        save_tasks(tasks)
+                return redirect(url_for('dashboard'))
+        return f"<script>alert('task is not running'); window.location.href='/dashboard'</script>"
+    return redirect(url_for('signin'))
 
 
 # Show code editor
@@ -204,11 +155,7 @@ def save_code(task_id):
             if int(task['id']) == task_id:
                 code = request.form['code']
                 task['code'] = code  # Update the 'code' field in the task dictionary
-                with open('tasks.csv', 'w', newline='') as csvfile:
-                    fieldnames = ['id', 'name', 'status','pid', 'code','cpu_usage']  # Adjust according to your CSV
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerow(task)  # Append the updated task to the CSV file
+                save_tasks(tasks)
                 break
         return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
@@ -220,7 +167,7 @@ def update_cpu_usage():
             # Update CPU usage for each task
             cpu_usage = psutil.cpu_percent(interval=1)  # Get CPU usage percentage
             task['cpu_usage'] = cpu_usage
-        save_tasks(tasks)
+            save_tasks(tasks)
         time.sleep(1)  # Update every 1 second
 
 if __name__ == '__main__':

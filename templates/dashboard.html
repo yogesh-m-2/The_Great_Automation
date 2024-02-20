@@ -78,23 +78,36 @@
             background-color: #007bff;
             color: white;
         }
+        .btn.add-task {
+            background-color: #28a745;
+            color: white;
+            margin-bottom: 10px;
+        }
+        .btn.delete-task {
+            background-color: #dc3545;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>Task List</h2>
+        <button class="btn add-task" onclick="addnewtask()">Add Task</button>
         <table>
             <tr>
                 <th>ID</th>
                 <th>Name</th>
                 <th>Status</th>
+                <th>CPU Usage</th>
                 <th>Action</th>
+                <th>Delete</th>
             </tr>
             {% for task in tasks %}
             <tr>
                 <td>{{ task.id }}</td>
                 <td>{{ task.name }}</td>
                 <td class="status {{ task.status.lower() }}">{{ task.status }}</td>
+                <td class="cpu {{ task.cpu_usage.lower() }}">{{ task.cpu_usage }}</td>
                 <td class="btn-group">
                     <form action="/start/{{ task.id }}" method="GET">
                         <button class="btn start">&#9654;</button>
@@ -112,9 +125,49 @@
                         <button class="btn code">Edit Code</button>
                     </form>
                 </td>
+                <td>
+                    <form action="/delete/{{ task.id }}" method="POST">
+                        <button class="btn delete-task">Delete</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </table>
     </div>
+    <script>
+        function addnewtask() {
+    // Open a prompt to get the task name from the user
+    const taskName = prompt("Enter task name:");
+    
+    // Check if the user entered a name
+    if (taskName) {
+        // Create a new XMLHttpRequest object
+        const xhr = new XMLHttpRequest();
+
+        // Set up the POST request
+        xhr.open("POST", "/add-task", true);
+        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+
+        // Set up the callback function to handle the response
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    // Request was successful
+                    console.log("Task added successfully!");
+                } else {
+                    // Request failed
+                    console.error("Failed to add task. Status code: " + xhr.status);
+                }
+            }
+        };
+
+        // Send the POST request with the task name as data
+        xhr.send("name=" + encodeURIComponent(taskName));
+        window.location.href = "/dashboard";
+    }
+}
+
+    </script>
 </body>
 </html>
+

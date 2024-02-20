@@ -110,11 +110,14 @@ def start_task(task_id):
         tasks = load_tasks()
         for task in tasks:
             if int(task['id']) == task_id:
-                task['status'] = 'Running'
-                code = task.get('code')
-                thread = MyThread(task_id,code)
-                thread.start()
-                save_tasks(tasks)
+                if task['status'] == 'Running':
+                    return f"<script>alert('task is already running'); window.location.href='/dashboard'</script>"
+                else:
+                    task['status'] = 'Running'
+                    code = task.get('code')
+                    thread = MyThread(task_id,code)
+                    thread.start()
+                    save_tasks(tasks)
         return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
 
@@ -159,6 +162,39 @@ def save_code(task_id):
                 break
         return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
+
+@app.route('/add-task', methods=['POST'])
+def add_task():
+    if 'username' in session:
+        task_name = request.form['name']
+        tasks = load_tasks()
+        task_ids = [int(task['id']) for task in tasks]
+        new_task_id = max(task_ids) + 1 if task_ids else 1
+        new_task = {
+            'id': str(new_task_id),
+            'name': task_name,
+            'status': 'Stopped',
+            'pid': '',
+            'code': '',
+            'cpu_usage': ''
+        }
+        tasks.append(new_task)
+        save_tasks(tasks)
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('signin'))
+
+# Delete task
+@app.route('/delete/<int:task_id>', methods=['POST'])
+def delete_task(task_id):
+    if 'username' in session:
+        tasks = load_tasks()
+        tasks = [task for task in tasks if int(task['id']) != task_id]
+        save_tasks(tasks)
+        
+        return redirect(url_for('dashboard'))
+    
+    return redirect(url_for('signin'))
+
 
 def update_cpu_usage():
     while True:

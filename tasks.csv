@@ -1,7 +1,15 @@
 id,name,status,pid,code,cpu_usage
 1,new,Stopped,,"import time
 
-for i in range(15):
-    time.sleep(1)
-    print(""hi"")
-",29.4
+
+while not stop_event.is_set():
+   time.sleep(1)
+   print('t1')",29.4
+2,new2,Stopped,,"import time
+
+
+count = 0
+while not stop_event.is_set():
+  print(count)
+  time.sleep(2)
+  count=count+1",

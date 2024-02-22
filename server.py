@@ -59,7 +59,7 @@ def load_tasks():
 # Function to save tasks to CSV
 def save_tasks(tasks):
     with open('tasks.csv', 'w', newline='') as file:
-        fieldnames = ['id', 'name', 'status','pid', 'code','cpu_usage']
+        fieldnames = ['id', 'name', 'status','progress','speed', 'code','cpu_usage']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(tasks)
@@ -174,7 +174,8 @@ def add_task():
             'id': str(new_task_id),
             'name': task_name,
             'status': 'Stopped',
-            'pid': '',
+            'progress': '',
+            'speed': 1,
             'code': '',
             'cpu_usage': ''
         }
@@ -193,6 +194,32 @@ def delete_task(task_id):
         
         return redirect(url_for('dashboard'))
     
+    return redirect(url_for('signin'))
+
+@app.route('/increase-speed/<int:task_id>')
+def increase_speed(task_id):
+    if 'username' in session:
+        tasks = load_tasks()
+        for task in tasks:
+            if int(task['id']) == task_id:
+                task['speed'] = int(task['speed']) + 1  # Convert to integer and increase speed
+                save_tasks(tasks)
+                break
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('signin'))
+
+# Decrease speed
+@app.route('/decrease-speed/<int:task_id>')
+def decrease_speed(task_id):
+    if 'username' in session:
+        tasks = load_tasks()
+        for task in tasks:
+            if int(task['id']) == task_id:
+                # Convert to integer and decrease speed, but ensure it's not below 1
+                task['speed'] = max(int(task['speed']) - 1, 1)
+                save_tasks(tasks)
+                break
+        return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
 
 

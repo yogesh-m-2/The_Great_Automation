@@ -15,11 +15,12 @@ count=0
 app.secret_key = "your_secret_key"
 
 class MyThread(threading.Thread):
-    def __init__(self, task_id,code):
+    def __init__(self, task_id,code,speed):
         super(MyThread, self).__init__()
         self.task_id = task_id
         self.stop_event = threading.Event()
         self.code = code
+        self.speed = speed
         
     
     def run(self):
@@ -27,15 +28,29 @@ class MyThread(threading.Thread):
         cmd = "python "+str(code_path)
         print(cmd)
         try:
-            exec(self.code,{'stop_event': self.stop_event})
-        except:
+            exec(self.code,{'stop_event': self.stop_event,'speed':self})
+        except Exception as e:
+            print(e)
+            tasks=load_tasks()
+            for task in tasks:
+                if int(task['id']) == self.task_id:
+                    task['status'] = 'Stopped'
+                    save_tasks(tasks)
             pass
+        print("trying to terminate")
+            
         tasks=load_tasks()
         for task in tasks:
             if int(task['id']) == self.task_id:
                 task['status'] = 'Stopped'
                 save_tasks(tasks)
         print("trying to terminate")
+
+    def get_speed(self):
+        return self.speed
+
+    def change_speed(self,val):
+        self.speed = val
             
     def stop(self):
         print("stopping thread")
@@ -115,7 +130,8 @@ def start_task(task_id):
                 else:
                     task['status'] = 'Running'
                     code = task.get('code')
-                    thread = MyThread(task_id,code)
+                    speed = task.get('speed')
+                    thread = MyThread(task_id,code,speed)
                     thread.start()
                     save_tasks(tasks)
         return redirect(url_for('dashboard'))
@@ -202,7 +218,10 @@ def increase_speed(task_id):
         tasks = load_tasks()
         for task in tasks:
             if int(task['id']) == task_id:
-                task['speed'] = int(task['speed']) + 1  # Convert to integer and increase speed
+                task['speed'] = int(task['speed']) + 1
+                for thread in threading.enumerate():
+                    if isinstance(thread, MyThread) and thread.task_id == task_id:
+                        thread.change_speed(task['speed'])
                 save_tasks(tasks)
                 break
         return redirect(url_for('dashboard'))
@@ -238,5 +257,4 @@ if __name__ == '__main__':
     update_cpu_thread = threading.Thread(target=update_cpu_usage)
     update_cpu_thread.daemon = True
     # update_cpu_thread.start()
-
     app.run(debug=True)

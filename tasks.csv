@@ -2,10 +2,32 @@ id,name,status,progress,speed,code,cpu_usage
 1,new,Stopped,,1,"import time
 import threading
 
+class TaskThread(threading.Thread):
+    def __init__(self, task_id):
+        super(TaskThread, self).__init__()
+        self.task_id = task_id
+    
+    def run(self):
+     while True:
+        pass
+ 
+
+   
+def count_thread():
+    count=0  
+    for thread in threading.enumerate():
+      if isinstance(thread, TaskThread) and thread.task_id == 1:
+            count += 1
+    return count
+
+
 
 while not stop_event.is_set():
    time.sleep(1)
-   print(threading.active_count())",29.4
+   print(count_thread(),speed.get_speed(),threading.active_count())
+   if(count_thread() < int(speed.get_speed())):
+     t1 = TaskThread(1)
+     t1.start()   ",29.4
 2,new2,Stopped,,1,"import time
 
 

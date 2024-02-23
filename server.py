@@ -28,7 +28,7 @@ class MyThread(threading.Thread):
         cmd = "python "+str(code_path)
         print(cmd)
         try:
-            exec(self.code,{'stop_event': self.stop_event,'speed':self})
+            exec(self.code,{'stop_event': self.stop_event,'task':self})
         except Exception as e:
             print(e)
             tasks=load_tasks()
@@ -48,10 +48,29 @@ class MyThread(threading.Thread):
 
     def get_speed(self):
         return self.speed
+    
+    def update_total_batch(self,total):
+        tasks=load_tasks()
+        for task in tasks:
+            if int(task['id']) == self.task_id:
+                task['total'] = total
+                save_tasks(tasks)
 
     def change_speed(self,val):
         self.speed = val
+
+    def load_progress(self):
+        tasks=load_tasks()
+        for task in tasks:
+            if int(task['id']) == self.task_id:
+                return task['progress']
             
+    def save_progress(self,progress):
+        tasks = load_tasks()
+        for task in tasks:
+            if int(task['id']) == self.task_id:
+                task['progress'] = progress
+                save_tasks(tasks)
     def stop(self):
         print("stopping thread")
         self.stop_event.set()
@@ -74,7 +93,7 @@ def load_tasks():
 # Function to save tasks to CSV
 def save_tasks(tasks):
     with open('tasks.csv', 'w', newline='') as file:
-        fieldnames = ['id', 'name', 'status','progress','speed', 'code','cpu_usage']
+        fieldnames = ['id', 'name', 'status','progress','total','speed', 'code','cpu_usage']
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(tasks)
@@ -191,6 +210,7 @@ def add_task():
             'name': task_name,
             'status': 'Stopped',
             'progress': '',
+            'total': 1,
             'speed': 1,
             'code': '',
             'cpu_usage': ''
@@ -236,6 +256,9 @@ def decrease_speed(task_id):
             if int(task['id']) == task_id:
                 # Convert to integer and decrease speed, but ensure it's not below 1
                 task['speed'] = max(int(task['speed']) - 1, 1)
+                for thread in threading.enumerate():
+                    if isinstance(thread, MyThread) and thread.task_id == task_id:
+                        thread.change_speed(task['speed'])
                 save_tasks(tasks)
                 break
         return redirect(url_for('dashboard'))

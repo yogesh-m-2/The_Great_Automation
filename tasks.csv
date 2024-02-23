@@ -1,15 +1,25 @@
-id,name,status,progress,speed,code,cpu_usage
-1,new,Stopped,,1,"import time
+id,name,status,progress,total,speed,code,cpu_usage
+1,new,Stopped,0,1,1,"import time
 import threading
+import requests
 
 class TaskThread(threading.Thread):
-    def __init__(self, task_id):
+    def __init__(self, task_id,url):
         super(TaskThread, self).__init__()
         self.task_id = task_id
+        self.url = url
     
     def run(self):
-     while True:
-        pass
+      if not stop_event.is_set():
+        try:
+          response = requests.head(self.url)
+          if response.status_code == 200:
+            print(f""{self.url} is UP"")
+          else:
+            print(f""{self.url} is DOWN (Status Code: {response.status_code})"")
+        except Exception as e:
+          print(e)
+          pass
  
 
    
@@ -21,14 +31,27 @@ def count_thread():
     return count
 
 
+base_url = ""https://www.example{}.com""
+num_urls = 200
+urls = [base_url.format(i) for i in range(1, num_urls + 1)]
+batch_size = max(1, len(urls) // 20)
+start_index = int(task.load_progress())
+task.update_total_batch(len(urls))
 
-while not stop_event.is_set():
-   time.sleep(1)
-   print(count_thread(),speed.get_speed(),threading.active_count())
-   if(count_thread() < int(speed.get_speed())):
-     t1 = TaskThread(1)
-     t1.start()   ",29.4
-2,new2,Stopped,,1,"import time
+for i in range(start_index, len(urls), batch_size):
+  batch = urls[i:i+batch_size]
+  for url in batch:
+        while count_thread() >= int(task.get_speed()):
+            time.sleep(1)
+        if stop_event.is_set():
+            break
+        print(threading.active_count())
+        t = TaskThread(1, url)
+        t.start()
+  task.save_progress(i + batch_size)
+
+",29.4
+2,new2,Stopped,0,1,1,"import time
 
 
 count = 0

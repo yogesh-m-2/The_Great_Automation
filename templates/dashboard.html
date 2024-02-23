@@ -109,7 +109,7 @@
                 <td>{{ task.id }}</td>
                 <td>{{ task.name }}</td>
                 <td class="status {{ task.status.lower() }}">{{ task.status }}</td>
-                <td>{{task.progress}}</td>
+                <td>{{ ((task.progress | int / task.total | int) * 100) }}%</td>
                 <td>
                     <span id="speed_{{ task.id }}">
                         <form action="/decrease-speed/{{ task.id }}" method="GET" style="display: inline-block;">
@@ -121,7 +121,7 @@
                         </form>
                     </span>
                 </td>
-                <td class="cpu {{ task.cpu_usage.lower() }}">{{ task.cpu_usage }}</td>
+                <td class="cpu">{{ task.cpu_usage }}</td>
                 <td class="btn-group">
                     <form action="/start/{{ task.id }}" method="GET">
                         <button class="btn start">&#9654;</button>

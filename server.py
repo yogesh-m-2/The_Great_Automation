@@ -111,7 +111,7 @@ def signin():
         username = request.form['username']
         password = request.form['password']
         # Check if username and password are correct
-        if username == 'your_username' and password == 'your_password':
+        if username == 'yogesh' and password == 'password':
             session['username'] = username
             return redirect(url_for('dashboard'))
         else:
@@ -199,9 +199,10 @@ def save_code(task_id):
     return redirect(url_for('signin'))
 
 @app.route('/add-task', methods=['POST'])
-def add_task():
+def add_task(task_name='New',code='',speed=1):
     if 'username' in session:
-        task_name = request.form['name']
+        if 'name' in request.form:
+            task_name = request.form['name']
         tasks = load_tasks()
         task_ids = [int(task['id']) for task in tasks]
         new_task_id = max(task_ids) + 1 if task_ids else 1
@@ -209,10 +210,10 @@ def add_task():
             'id': str(new_task_id),
             'name': task_name,
             'status': 'Stopped',
-            'progress': '',
+            'progress': 0,
             'total': 1,
-            'speed': 1,
-            'code': '',
+            'speed': speed,
+            'code': code,
             'cpu_usage': ''
         }
         tasks.append(new_task)
@@ -230,6 +231,17 @@ def delete_task(task_id):
         
         return redirect(url_for('dashboard'))
     
+    return redirect(url_for('signin'))
+
+@app.route('/restart/<int:task_id>', methods=['POST'])
+def restart_task(task_id):
+    if 'username' in session:
+        tasks = load_tasks()
+        for task in tasks:
+            if int(task["id"]) == task_id:
+                task["progress"] = 0
+        save_tasks(tasks)
+        return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
 
 @app.route('/increase-speed/<int:task_id>')
@@ -264,6 +276,26 @@ def decrease_speed(task_id):
         return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
 
+@app.route('/nmap', methods=['POST'])
+def nmap():
+    ip = request.form.get('ip')
+    all_ports = request.form.get('all_ports')
+    start_port = request.form.get('start_port')
+    end_port = request.form.get('end_port')
+    print("IP Address:", ip)
+    if all_ports:
+        with open("nmap", 'r') as file:
+            file_content = file.read()
+            replaced_content = file_content.replace("start_range", "0").replace("end_range", "65535").replace("ip_goes_here",ip)
+            add_task(task_name="nmap_"+ip,code=replaced_content,speed=500)
+            print(replaced_content)
+    else:
+        with open("nmap", 'r') as file:
+            file_content = file.read()
+            replaced_content = file_content.replace("start_range", start_port).replace("end_range", end_port).replace("ip_goes_here",ip)
+            add_task(task_name="nmap_"+ip,code=replaced_content,speed=100)
+            print(replaced_content)
+    return "added nmap"
 
 def update_cpu_usage():
     while True:

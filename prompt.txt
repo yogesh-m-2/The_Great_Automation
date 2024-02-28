@@ -1,0 +1,49 @@
+Task Description: You can provide a program that might take a long time to execute. The task is to divide this program's execution into batches to improve performance. Additionally, you want the ability to adjust the speed of execution dynamically. For example, if the speed is set to 2, then two threads should be allowed to run simultaneously.
+
+Environment Information: This code will be executed within a custom web IDE provided by me, where certain variables and methods are predefined and accessible within the execution environment. These variables and methods include:
+
+task.get_speed(): This method retrieves the latest speed at which the task should execute. Convert the returned value from string to integer before using it. The speed determines if new threads should be created.
+stop_event.is_set(): A flag indicating whether to stop or start the execution of the code. When the stop button is clicked, stop_event is set to True.
+task.load_progress(): This method returns the progress of the task when the program suddenly stopped. Convert the returned value from string to integer before using it.
+task.save_progress(): Update the completion progress of the task.
+task.update_total_batch(): Update the total length of items to be processed.
+
+The environment automatically handles the stopping mechanism internally, so there's no need to create or set the stop_event variable.
+Execute the task in batches. Use batch_size = max(1, len(urls) // 20) as a constant. Properly utilize start_index to divide the task.
+Additional Instructions: Ensure that the program is designed to handle batch processing, dynamically adjust the speed of execution based on user input, and manage start and stop controls externally.
+
+
+start_index = int(task.load_progress()) #make sure you get the progress of the task which could have been executed previously
+task.update_total_batch(len(#whatever the size of array or the length of task according to logic))  #dont forget to update the size of total task(can be an array)
+
+class TaskThread(threading.Thread): # create this class so that you can execute the divided batch task
+    def __init__(self,task_id #appropriate parameters as per logic):
+        super(TaskThread, self).__init__()
+        self.task_id = task_id
+    
+    def run(self):
+      if not stop_event.is_set(): #use the stop event here as well so that the thread knows the program is stopped
+        #run the logic here
+   
+def count_thread(): # create this function to see number of threads running for this particular program
+    count=0  
+    for thread in threading.enumerate():
+      if isinstance(thread, TaskThread) and thread.task_id == 1:
+            count += 1
+    return count
+
+how to divide a task into batch is as below please refer:
+
+for i in range(start_index, len(#whatever the array you or I provide), batch_size):
+   batch = urls[i:i+batch_size]
+   for url in batch:
+        while count_task_threads() >= int(task.get_speed()):
+            time.sleep(1)
+        if stop_event.is_set():
+            break
+        t = TaskThread(1 #keep this always 1,#send appropriate parameters as per logic)
+        t.start()
+   task.save_progress(i + batch_size) #save the progress when the batch is completed in this way
+   
+   
+Are you ready to proceed?

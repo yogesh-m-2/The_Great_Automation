@@ -1,0 +1,48 @@
+import socket
+import threading
+import time
+
+start_index = int(task.load_progress()) if task.load_progress() else 0
+
+# Define the target host and ports to scan
+target_host = "ip_goes_here"
+target_ports = range(start_range, end_range)
+
+batch_size = max(1, len(target_ports) // 20)
+task.update_total_batch(len(target_ports))
+
+class TaskThread(threading.Thread):
+    def __init__(self, port):
+        super(TaskThread, self).__init__()
+        self.port = port
+
+    def run(self):
+        if not stop_event.is_set():
+            # Scan the port
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)  # Adjust timeout as needed
+                result = sock.connect_ex((target_host, self.port))
+                if result == 0:
+                    print(f"Port {self.port}: Open")
+                sock.close()
+            except Exception as e:
+                print(f"Error scanning port {self.port}: {str(e)}")
+
+def count_task_threads():
+    count = 0
+    for thread in threading.enumerate():
+        if isinstance(thread, TaskThread):
+            count += 1
+    return count
+
+for i in range(start_index, len(target_ports), batch_size):
+    batch = target_ports[i:i+batch_size]
+    for port in batch:
+        while count_task_threads() >= int(task.get_speed()):
+            time.sleep(1)
+        if stop_event.is_set():
+            break
+        t = TaskThread(port)
+        t.start()
+    task.save_progress(i + batch_size)

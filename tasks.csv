@@ -1,5 +1,5 @@
 id,name,status,progress,total,speed,code,cpu_usage
-1,new,Stopped,0,1,1,"import time
+1,new,Stopped,200,200,9,"import time
 import threading
 import requests
 
@@ -48,14 +48,110 @@ for i in range(start_index, len(urls), batch_size):
         print(threading.active_count())
         t = TaskThread(1, url)
         t.start()
-  task.save_progress(i + batch_size)
+  task.save_progress(i + batch_size)",29.4
+2,new2,Stopped,200,200,5,"import threading
+import requests
+import time
 
-",29.4
-2,new2,Stopped,0,1,1,"import time
+base_url = ""https://www.example{}.com""
+num_urls = 200
+urls = [base_url.format(i) for i in range(1, num_urls + 1)]
+batch_size = max(1, len(urls) // 20)
 
+start_index = task.load_progress()
+if start_index is None:
+    start_index = 0
+else:
+    start_index = int(start_index)
 
-count = 0
-while not stop_event.is_set():
-  print(count)
-  time.sleep(2)
-  count=count+1",
+task.update_total_batch(len(urls))
+
+class TaskThread(threading.Thread):
+    def __init__(self, urls):
+        super(TaskThread, self).__init__()
+        self.urls = urls
+
+    def run(self):
+        for url in self.urls:
+            try:
+                response = requests.head(url)
+                if response.status_code == 200:
+                    print(f""{url} is UP"")
+                else:
+                    print(f""{url} is DOWN (Status Code: {response.status_code})"")
+            except Exception as e:
+                print(e)
+                pass
+
+def count_task_threads():
+    count = 0
+    for thread in threading.enumerate():
+        if isinstance(thread, TaskThread):
+            count += 1
+    return count
+
+while start_index < len(urls):
+    if stop_event.is_set():
+        break
+    
+    while count_task_threads() >= int(task.get_speed()):
+        time.sleep(1)
+        
+    if stop_event.is_set():
+        break
+    
+    batch = urls[start_index:start_index + batch_size]
+    t = TaskThread(batch)
+    t.start()
+    
+    start_index += batch_size
+    task.save_progress(start_index)
+",
+3,nmap_192.168.0.1,Stopped,504,499,472,"import socket
+import threading
+import time
+
+start_index = int(task.load_progress()) if task.load_progress() else 0
+
+# Define the target host and ports to scan
+target_host = ""192.168.0.1""
+target_ports = range(1, 500)
+
+batch_size = max(1, len(target_ports) // 20)
+task.update_total_batch(len(target_ports))
+
+class TaskThread(threading.Thread):
+    def __init__(self, port):
+        super(TaskThread, self).__init__()
+        self.port = port
+
+    def run(self):
+        if not stop_event.is_set():
+            # Scan the port
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(2)  # Adjust timeout as needed
+                result = sock.connect_ex((target_host, self.port))
+                if result == 0:
+                    print(f""Port {self.port}: Open"")
+                sock.close()
+            except Exception as e:
+                print(f""Error scanning port {self.port}: {str(e)}"")
+
+def count_task_threads():
+    count = 0
+    for thread in threading.enumerate():
+        if isinstance(thread, TaskThread):
+            count += 1
+    return count
+
+for i in range(start_index, len(target_ports), batch_size):
+    batch = target_ports[i:i+batch_size]
+    for port in batch:
+        while count_task_threads() >= int(task.get_speed()):
+            time.sleep(1)
+        if stop_event.is_set():
+            break
+        t = TaskThread(port)
+        t.start()
+    task.save_progress(i + batch_size)",

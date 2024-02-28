@@ -92,9 +92,25 @@
 <body>
     <div class="container">
         <h2>Task List</h2>
+        <!-- Dropdown menu -->
+        <label for="taskSelect">Select Task:</label>
+        <select id="taskSelect">
+            <option value="nmap">nmap</option>
+            <option value="httpx">httpx</option>
+            <option value="subfinder">subfinder</option>
+            <option value="intruder">intruder</option>
+            <option value="dirbuster">dirbuster</option>
+            <option value="sqlinjection">sqlinjection</option>
+            <option value="xss">xss injection</option>
+            <option value="eyewitness">eyewitness</option>
+        </select>
+        <!-- Add Task button for dropdown -->
+        <button class="btn add-task-dropdown" onclick="addnewtaskDropdown()">Add Task from Dropdown</button>
+        <!-- Add Task button as before -->
         <button class="btn add-task" onclick="addnewtask()">Add Task</button>
         <table>
             <tr>
+                <!-- Table headers -->
                 <th>ID</th>
                 <th>Name</th>
                 <th>Status</th>
@@ -104,6 +120,7 @@
                 <th>Action</th>
                 <th>Delete</th>
             </tr>
+            <!-- Task rows -->
             {% for task in tasks %}
             <tr>
                 <td>{{ task.id }}</td>
@@ -123,6 +140,7 @@
                 </td>
                 <td class="cpu">{{ task.cpu_usage }}</td>
                 <td class="btn-group">
+                    <!-- Action buttons -->
                     <form action="/start/{{ task.id }}" method="GET">
                         <button class="btn start">&#9654;</button>
                     </form>
@@ -132,7 +150,7 @@
                     <form action="/stop/{{ task.id }}" method="GET">
                         <button class="btn stop">&#9724;</button>
                     </form>
-                    <form action="/restart/{{ task.id }}" method="GET">
+                    <form action="/restart/{{ task.id }}" method="POST">
                         <button class="btn restart">&#8634;</button>
                     </form>
                     <form action="/edit/{{ task.id }}" method="GET">
@@ -140,6 +158,7 @@
                     </form>
                 </td>
                 <td>
+                    <!-- Delete button -->
                     <form action="/delete/{{ task.id }}" method="POST">
                         <button class="btn delete-task">Delete</button>
                     </form>
@@ -149,7 +168,8 @@
         </table>
     </div>
     <script>
-        function addnewtask() {
+    
+    function addnewtask() {
     // Open a prompt to get the task name from the user
     const taskName = prompt("Enter task name:");
     
@@ -180,7 +200,46 @@
         window.location.href = "/dashboard";
     }
 }
+function do_nmap() {
+    var ipAddress = prompt("Please enter the IP address:");
+    if (ipAddress === null || ipAddress === "") {
+        return; // Exit if user cancels or inputs empty string
+    }
 
+    var useAllPorts = confirm("Do you want to scan all ports? Click OK for yes, or Cancel for a range of ports.");
+
+    var portInfo;
+    if (useAllPorts) {
+        portInfo = "all_ports=true";
+    } else {
+        var startPort = parseInt(prompt("Please enter the start port:"));
+        var endPort = parseInt(prompt("Please enter the end port:"));
+        portInfo = "start_port=" + encodeURIComponent(startPort) + "&end_port=" + encodeURIComponent(endPort);
+    }
+
+    var urlEncodedParams = "ip=" + encodeURIComponent(ipAddress) + "&" + portInfo;
+    
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/nmap", true);
+    xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            window.location.href = "/dashboard";
+        }
+    };
+    xhr.send(urlEncodedParams);
+}
+
+        function addnewtaskDropdown() {
+            const selectedTask = document.getElementById("taskSelect").value;
+            if(selectedTask=="nmap"){
+                  do_nmap()
+            }
+            else{
+                console.log(selectedTask)
+            }
+            
+        }
     </script>
 </body>
 </html>

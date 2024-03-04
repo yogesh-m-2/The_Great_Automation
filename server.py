@@ -228,7 +228,7 @@ def delete_task(task_id):
         tasks = load_tasks()
         tasks = [task for task in tasks if int(task['id']) != task_id]
         save_tasks(tasks)
-        
+        os.remove(f'file_{task_id}') if os.path.exists(f'file_{task_id}') else None
         return redirect(url_for('dashboard'))
     
     return redirect(url_for('signin'))
@@ -240,6 +240,7 @@ def restart_task(task_id):
         for task in tasks:
             if int(task["id"]) == task_id:
                 task["progress"] = 0
+                os.remove(f'file_{task_id}') if os.path.exists(f'file_{task_id}') else None
         save_tasks(tasks)
         return redirect(url_for('dashboard'))
     return redirect(url_for('signin'))
@@ -288,14 +289,35 @@ def nmap():
             file_content = file.read()
             replaced_content = file_content.replace("start_range", "0").replace("end_range", "65535").replace("ip_goes_here",ip)
             add_task(task_name="nmap_"+ip,code=replaced_content,speed=500)
-            print(replaced_content)
     else:
         with open("nmap", 'r') as file:
             file_content = file.read()
             replaced_content = file_content.replace("start_range", start_port).replace("end_range", end_port).replace("ip_goes_here",ip)
             add_task(task_name="nmap_"+ip,code=replaced_content,speed=100)
-            print(replaced_content)
     return "added nmap"
+
+@app.route('/dirbuster', methods=['POST'])
+def dirbuster():
+    url = request.json.get('url')
+    print(url)
+    status_codes = request.json.get('excludedstatuscodes', [])
+    #print(status_codes)
+    with open("dirbuster", 'r') as file:
+            file_content = file.read()
+            replaced_content = file_content.replace("url_goes_here", url).replace("array_status_code",str(status_codes))
+            add_task(task_name="dirbuster_"+url,code=replaced_content,speed=500)
+    return "dirbuster added"
+
+@app.route('/file_<task_id>')
+def get_file(task_id):
+    # Construct the filename based on the task ID
+    filename = f"file_{task_id}"
+    # Check if the file exists
+    if os.path.exists(filename):
+        with open(f'file_{task_id}', 'r') as f:
+            return f.read()
+    else:
+        return "File not found", 404
 
 def update_cpu_usage():
     while True:

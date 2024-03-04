@@ -1,0 +1,59 @@
+import time
+import threading
+import requests
+import socket
+
+class Dirbuster(threading.Thread):
+    def __init__(self,word):
+        super(Dirbuster, self).__init__()
+        self.word = word
+        self.input_url = "url_goes_here"
+        self.host = self.input_url.split('//')[-1].split('/')[0]
+        self.security = self.input_url.split('://')[0]
+    
+    def run(self):
+      if not stop_event.is_set():
+        try:
+          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+          s.settimeout(5)  # Adjust timeout as needed
+          print(self.security == 'https')
+          s.connect((self.host, 443)) if self.security == 'https' else s.connect((self.host, 80))
+          s.sendall(f"HEAD /{self.word} HTTP/1.1\r\nHost: {self.host}\r\nConnection: close\r\n\r\n".encode())
+          response = s.recv(4096).decode()
+          status_code = int(response.split()[1])
+          if str(status_code) not in array_status_code:
+            with open(f'file_{task.task_id}', 'a') as f:
+              f.write(f"{self.host}/{self.word} {status_code}\n")
+          s.close()
+        except Exception as e:
+          print(e)
+          pass
+ 
+
+   
+def count_thread():
+    count=0  
+    for thread in threading.enumerate():
+      if isinstance(thread, Dirbuster):
+            count += 1
+    return count
+
+
+wordlist_url = "https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt"
+response = requests.get(wordlist_url)
+wordlist = response.text.splitlines()
+batch_size = max(1, len(wordlist) // 20)
+start_index = int(task.load_progress())
+task.update_total_batch(len(wordlist))
+
+for i in range(start_index, len(wordlist), batch_size):
+  batch = wordlist[i:i+batch_size]
+  for word in batch:
+    while count_thread() >= int(task.get_speed()):
+        time.sleep(1)
+    if stop_event.is_set():
+        break
+    t = Dirbuster(word)
+    t.start()
+  if not stop_event.is_set():
+        task.save_progress(i + batch_size)

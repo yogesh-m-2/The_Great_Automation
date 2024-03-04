@@ -30,9 +30,11 @@
             padding: 8px;
             text-align: left;
             border-bottom: 1px solid #ddd;
+            white-space: normal;
         }
         th {
             background-color: #f2f2f2;
+            white-space: normal;
         }
         .status {
             text-align: center;
@@ -124,7 +126,7 @@
             {% for task in tasks %}
             <tr>
                 <td>{{ task.id }}</td>
-                <td>{{ task.name }}</td>
+                <td>{{ task.name }}<button class="btn view-file" onclick="viewFile('{{ task.id }}')">View File</button></td>
                 <td class="status {{ task.status.lower() }}">{{ task.status }}</td>
                 <td>{{ ((task.progress | int / task.total | int) * 100) }}%</td>
                 <td>
@@ -230,16 +232,90 @@ function do_nmap() {
     xhr.send(urlEncodedParams);
 }
 
+function do_dirbuster(){
+    var url = prompt("Please enter the URL:");
+    if (!url) {
+        // If user cancels or inputs an empty string, exit
+        return;
+    }
+
+    // Regular expression to check if the URL format is valid
+    var urlRegex = /^(http|https):\/\/[^ "]+$/;
+
+    if (!urlRegex.test(url)) {
+        alert("Error: Invalid URL format. Please enter a valid URL starting with http:// or https://");
+        return;
+    }
+
+    var excludeStatusCodes = prompt("Please enter the status codes to exclude (if any), separated by commas:");
+    // Validate the exclude status codes (if provided)
+    if (excludeStatusCodes !== null) {
+        var statusCodeArray = excludeStatusCodes.split(",").map(function(code) {
+            return code.trim();
+        });
+        for (var i = 0; i < statusCodeArray.length; i++) {
+            if (!(/^\d+$/.test(statusCodeArray[i]))) {
+                alert("Error: Invalid status code format. Please enter numeric values separated by commas.");
+                return;
+            }
+        }
+    }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", "/dirbuster", true);
+    xhr.setRequestHeader("Content-type", "application/json");
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            window.location.href = "/dashboard";
+        }
+    };
+
+    // Construct the data to send
+    var requestData = {
+        "url": url,
+        "excludedstatuscodes": statusCodeArray
+    };
+    xhr.send(JSON.stringify(requestData));
+}
+
+
         function addnewtaskDropdown() {
             const selectedTask = document.getElementById("taskSelect").value;
-            if(selectedTask=="nmap"){
-                  do_nmap()
-            }
-            else{
-                console.log(selectedTask)
-            }
+            switch(selectedTask) {
+        case 'nmap':
+            do_nmap()
+            break;
+        case 'dirbuster':
+            do_dirbuster()
+            break;
+        
+        default:
+            console.log(selectedTask)
+    }
+        
             
         }
+    function viewFile(taskId) {
+        // Send an XMLHttpRequest to fetch the file content
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", `/file_${taskId}`, true);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    // File content received successfully
+                    const fileContent = xhr.responseText;
+
+                    // Open a new popup window to display the file content
+                    const fileWindow = window.open("", "File Content", "width=600,height=400");
+                    fileWindow.document.write(`<pre>${fileContent}</pre>`);
+                } else {
+                    // Failed to fetch file content
+                    console.error(`Failed to fetch file for task ${taskId}. Status code: ${xhr.status}`);
+                }
+            }
+        };
+        xhr.send();
+    }
     </script>
 </body>
 </html>

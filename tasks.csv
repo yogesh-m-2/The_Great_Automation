@@ -107,15 +107,15 @@ while start_index < len(urls):
     start_index += batch_size
     task.save_progress(start_index)
 ",
-3,nmap_192.168.0.1,Stopped,504,499,472,"import socket
+3,nmap_google.com,Stopped,0,65535,500,"import socket
 import threading
 import time
 
 start_index = int(task.load_progress()) if task.load_progress() else 0
 
 # Define the target host and ports to scan
-target_host = ""192.168.0.1""
-target_ports = range(1, 500)
+target_host = ""google.com""
+target_ports = range(0, 65535)
 
 batch_size = max(1, len(target_ports) // 20)
 task.update_total_batch(len(target_ports))
@@ -152,6 +152,225 @@ for i in range(start_index, len(target_ports), batch_size):
             time.sleep(1)
         if stop_event.is_set():
             break
+        print(threading.active_count())
         t = TaskThread(port)
         t.start()
     task.save_progress(i + batch_size)",
+4,dirbuster_https://google.com,Stopped,0,9645,500,"import time
+import threading
+import requests
+import socket
+
+class Dirbuster(threading.Thread):
+    def __init__(self,word):
+        super(Dirbuster, self).__init__()
+        self.word = word
+        self.input_url = ""https://google.com""
+        self.host = self.input_url.split('//')[-1].split('/')[0]
+    
+    def run(self):
+      if not stop_event.is_set():
+        try:
+          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+          s.settimeout(5)  # Adjust timeout as needed
+          s.connect((self.host, 80))
+          s.sendall(f""HEAD /{self.word} HTTP/1.1\r\nHost: {self.host}\r\nConnection: close\r\n\r\n"".encode())
+          response = s.recv(4096).decode()
+          status_code = int(response.split()[1])
+          if status_code != 404:
+            print(f""{self.host}/{self.word} is {status_code}"")
+          s.close()
+        except Exception as e:
+          print(e)
+          pass
+ 
+
+   
+def count_thread():
+    count=0  
+    for thread in threading.enumerate():
+      if isinstance(thread, Dirbuster):
+            count += 1
+    return count
+
+
+wordlist_url = ""https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt""
+response = requests.get(wordlist_url)
+wordlist = response.text.splitlines()
+batch_size = max(1, len(wordlist) // 20)
+start_index = int(task.load_progress())
+task.update_total_batch(len(wordlist))
+
+for i in range(start_index, len(wordlist), batch_size):
+  batch = wordlist[i:i+batch_size]
+  for word in batch:
+    while count_thread() >= int(task.get_speed()):
+        time.sleep(1)
+    if stop_event.is_set():
+        break
+    print(threading.active_count())
+    t = Dirbuster(word)
+    t.start()
+  task.save_progress(i + batch_size)",
+5,dirbuster_https://beta.unifytwin.com,Stopped,0,9645,500,"import time
+import threading
+import requests
+import socket
+
+class Dirbuster(threading.Thread):
+    def __init__(self,word):
+        super(Dirbuster, self).__init__()
+        self.word = word
+        self.input_url = ""https://beta.unifytwin.com""
+        self.host = self.input_url.split('//')[-1].split('/')[0]
+    
+    def run(self):
+      if not stop_event.is_set():
+        try:
+          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+          s.settimeout(5)  # Adjust timeout as needed
+          s.connect((self.host, 80))
+          s.sendall(f""HEAD /{self.word} HTTP/1.1\r\nHost: {self.host}\r\nConnection: close\r\n\r\n"".encode())
+          response = s.recv(4096).decode()
+          status_code = int(response.split()[1])
+          if str(status_code) not in ['404', '403', '308','400']:
+            print(f""{self.host}/{self.word} is {status_code}"")
+          s.close()
+        except Exception as e:
+          print(e)
+          pass
+ 
+
+   
+def count_thread():
+    count=0  
+    for thread in threading.enumerate():
+      if isinstance(thread, Dirbuster):
+            count += 1
+    return count
+
+
+wordlist_url = ""https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt""
+response = requests.get(wordlist_url)
+wordlist = response.text.splitlines()
+batch_size = max(1, len(wordlist) // 20)
+start_index = int(task.load_progress())
+task.update_total_batch(len(wordlist))
+
+for i in range(start_index, len(wordlist), batch_size):
+  batch = wordlist[i:i+batch_size]
+  for word in batch:
+    while count_thread() >= int(task.get_speed()):
+        time.sleep(1)
+    if stop_event.is_set():
+        break
+    t = Dirbuster(word)
+    t.start()
+  task.save_progress(i + batch_size)",
+6,nmap_beta.unifytwin.com,Stopped,0,65535,500,"import socket
+import threading
+import time
+
+start_index = int(task.load_progress()) if task.load_progress() else 0
+# Define the target host and ports to scan
+target_host = ""beta.unifytwin.com""
+target_ports = range(0, 65535)
+batch_size = max(1, len(target_ports) // 20)
+task.update_total_batch(len(target_ports))
+
+class TaskThread(threading.Thread):
+    def __init__(self, port):
+        super(TaskThread, self).__init__()
+        self.port = port
+
+    def run(self):
+        if not stop_event.is_set():
+            # Scan the port
+            try:
+                with open(f'file_{task.task_id}', 'a') as f:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock.settimeout(2)  # Adjust timeout as needed
+                    result = sock.connect_ex((target_host, self.port))
+                    if result == 0:
+                        f.write(str(self.port)+""\n"")
+                    sock.close()
+            except Exception as e:
+                print(f""Error scanning port {self.port}: {str(e)}"")
+
+def count_task_threads():
+    count = 0
+    for thread in threading.enumerate():
+        if isinstance(thread, TaskThread):
+            count += 1
+    return count
+
+for i in range(start_index, len(target_ports), batch_size):
+    batch = target_ports[i:i+batch_size]
+    for port in batch:
+        while count_task_threads() >= int(task.get_speed()):
+            time.sleep(1)
+        if stop_event.is_set():
+            break
+        t = TaskThread(port)
+        t.start()
+    if not stop_event.is_set():
+        task.save_progress(i + batch_size)",
+7,dirbuster_https://beta.unifytwin.com,Stopped,10122,9645,500,"import time
+import threading
+import requests
+import socket
+
+class Dirbuster(threading.Thread):
+    def __init__(self,word):
+        super(Dirbuster, self).__init__()
+        self.word = word
+        self.input_url = ""https://beta.unifytwin.com""
+        self.host = self.input_url.split('//')[-1].split('/')[0]
+        self.security = self.input_url.split('://')[0]
+    
+    def run(self):
+      if not stop_event.is_set():
+        try:
+          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+          s.settimeout(5)  # Adjust timeout as needed
+          print(self.security == 'https')
+          s.connect((self.host, 443)) if self.security == 'https' else s.connect((self.host, 80))
+          s.sendall(f""HEAD /{self.word} HTTP/1.1\r\nHost: {self.host}\r\nConnection: close\r\n\r\n"".encode())
+          response = s.recv(4096).decode()
+          status_code = int(response.split()[1])
+          if str(status_code) not in ['404', '403']:
+            with open(f'file_{task.task_id}', 'a') as f:
+              f.write(f""{self.host}/{self.word} {status_code}\n"")
+          s.close()
+        except Exception as e:
+          print(e)
+          pass
+ 
+
+   
+def count_thread():
+    count=0  
+    for thread in threading.enumerate():
+      if isinstance(thread, Dirbuster):
+            count += 1
+    return count
+
+
+wordlist_url = ""https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt""
+response = requests.get(wordlist_url)
+wordlist = response.text.splitlines()
+batch_size = max(1, len(wordlist) // 20)
+start_index = int(task.load_progress())
+task.update_total_batch(len(wordlist))
+
+for i in range(start_index, len(wordlist), batch_size):
+  batch = wordlist[i:i+batch_size]
+  for word in batch:
+    while count_thread() >= int(task.get_speed()):
+        time.sleep(1)
+    if stop_event.is_set():
+        break
+    t = Dirbuster(word)
+    t.start()
+  if not stop_event.is_set():
+        task.save_progress(i + batch_size)",

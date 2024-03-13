@@ -1,5 +1,4 @@
-package hello;
-
+package javafiles;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -7,7 +6,6 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.net.URL;
-
 
 public class Usesocket {
 
@@ -25,9 +23,11 @@ public class Usesocket {
             Socket socket = new Socket(host, port);
 
             // Formulate HTTP request
-            String request = "GET " + path + " HTTP/1.1\r\n";
+            String request = "GET /" + path + " HTTP/1.1\r\n";
             request += "Host: " + host + "\r\n";
-            request += "Connection: close\r\n\r\n";
+            // request += "Connection: close\r\n\r\n";
+
+            System.out.println(request);
 
             // Send request
             OutputStream outputStream = socket.getOutputStream();
@@ -38,6 +38,7 @@ public class Usesocket {
             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             String line;
             StringBuilder response = new StringBuilder();
+            System.out.println(reader.readLine());
             while ((line = reader.readLine()) != null) {
                 response.append(line).append("\n");
             }

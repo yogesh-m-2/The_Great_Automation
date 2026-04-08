@@ -1,0 +1,129 @@
+import socket
+import ssl
+import threading
+import time
+import re
+
+raw_targets = """targets_goes_here"""
+targets = [t.strip() for t in raw_targets.strip().splitlines() if t.strip()]
+
+batch_size = max(1, len(targets) // 20)
+start_index = int(task.load_progress())
+task.update_total_batch(len(targets))
+
+
+def probe(scheme, host, port):
+    try:
+        raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        raw.settimeout(5)
+        raw.connect((host, port))
+
+        if scheme == "https":
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            s = ctx.wrap_socket(raw, server_hostname=host)
+        else:
+            s = raw
+
+        req = (
+            f"GET / HTTP/1.1\r\n"
+            f"Host: {host}\r\n"
+            f"User-Agent: Mozilla/5.0\r\n"
+            f"Accept: */*\r\n"
+            f"Connection: close\r\n\r\n"
+        )
+        s.sendall(req.encode())
+
+        data = b""
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+            if b"\r\n\r\n" in data and len(data) > 16384:
+                break
+        s.close()
+
+        text = data.decode("utf-8", errors="ignore")
+        lines = text.split("\r\n")
+        status_parts = lines[0].split(" ", 2) if lines else []
+        status = status_parts[1] if len(status_parts) >= 2 else "?"
+
+        headers = {}
+        for line in lines[1:]:
+            if ":" in line:
+                k, _, v = line.partition(":")
+                headers[k.lower().strip()] = v.strip()
+            elif line == "":
+                break
+
+        body = text.split("\r\n\r\n", 1)[1] if "\r\n\r\n" in text else ""
+        m = re.search(r"<title[^>]*>(.*?)</title>", body, re.I | re.S)
+        title = re.sub(r"\s+", " ", m.group(1).strip())[:80] if m else ""
+
+        out = f"{scheme}://{host}:{port}  [{status}]"
+        if title:
+            out += f'  title:"{title}"'
+        if "server" in headers:
+            out += f"  server:{headers['server']}"
+        if status in ("301","302","307","308") and "location" in headers:
+            out += f"  -> {headers['location']}"
+        return out
+
+    except Exception as e:
+        return f"{scheme}://{host}:{port}  [ERR: {str(e)[:50]}]"
+
+
+class HttpxThread(threading.Thread):
+    def __init__(self, target):
+        super().__init__()
+        self.target = target
+        self.daemon = True
+
+    def run(self):
+        if stop_event.is_set():
+            return
+
+        t = self.target
+        if "://" in t:
+            scheme = t.split("://")[0].lower()
+            rest = t.split("://")[1]
+            schemes = [scheme]
+        else:
+            rest = t
+            schemes = ["http", "https"]
+
+        host_part = rest.split("/")[0]
+        if ":" in host_part:
+            host, port_s = host_part.rsplit(":", 1)
+            default_ports = {s: int(port_s) for s in schemes}
+        else:
+            host = host_part
+            default_ports = {"http": 80, "https": 443}
+
+        results = []
+        for scheme in schemes:
+            if stop_event.is_set():
+                break
+            results.append(probe(scheme, host, default_ports[scheme]))
+
+        if results:
+            with open(f"file_{task.task_id}", "a") as f:
+                f.write("\n".join(results) + "\n")
+
+
+def count_threads():
+    return sum(1 for t in threading.enumerate() if isinstance(t, HttpxThread))
+
+
+for i in range(start_index, len(targets), batch_size):
+    batch = targets[i:i + batch_size]
+    for target in batch:
+        while count_threads() >= int(task.get_speed()):
+            time.sleep(0.5)
+        if stop_event.is_set():
+            break
+        HttpxThread(target).start()
+    if not stop_event.is_set():
+        task.save_progress(i + batch_size)

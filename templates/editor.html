@@ -1,63 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Code - The Great Automation</title>
-    <style>
-        /* Add your CSS styles here */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-        }
-        .container {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        h2 {
-            margin-top: 0;
-            text-align: center;
-        }
-        textarea {
-            width: 100%;
-            height: 300px;
-            padding: 10px;
-            margin-bottom: 20px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            resize: vertical;
-        }
-        .btn-group {
-            text-align: center;
-        }
-        .btn {
-            padding: 8px 16px;
-            margin: 0 5px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .btn.save {
-            background-color: #007bff;
-            color: white;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Code – Task {{ task.id }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117; color: #e2e8f0;
+      min-height: 100vh; display: flex; flex-direction: column;
+    }
+    header {
+      background: #1a1d27; border-bottom: 1px solid #2d3148;
+      padding: 0 24px; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    header h1 { font-size: 1rem; font-weight: 600; color: #a78bfa; }
+    .tag { font-size: .78rem; color: #94a3b8; background: #0f1117;
+           border: 1px solid #2d3148; padding: 3px 10px; border-radius: 20px; }
+
+    .editor-wrap {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 20px 24px; gap: 12px;
+    }
+    .info { font-size: .82rem; color: #94a3b8; }
+    .info strong { color: #a78bfa; }
+
+    form { display: flex; flex-direction: column; flex: 1; gap: 12px; }
+
+    textarea {
+      flex: 1; min-height: 480px;
+      background: #1a1d27; border: 1px solid #2d3148;
+      border-radius: 8px; color: #e2e8f0;
+      font-family: 'Courier New', Consolas, monospace;
+      font-size: .88rem; line-height: 1.6;
+      padding: 16px; resize: vertical; outline: none;
+      tab-size: 4;
+    }
+    textarea:focus { border-color: #a78bfa; }
+
+    .btn-row { display: flex; gap: 10px; }
+    .btn {
+      padding: 9px 20px; border: none; border-radius: 7px;
+      font-size: .88rem; font-weight: 600; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-save   { background: #a78bfa; color: #0f1117; }
+    .btn-cancel { background: #1e2235; color: #94a3b8;
+                  border: 1px solid #2d3148; text-decoration: none;
+                  display: inline-flex; align-items: center; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Edit Code</h2>
-        <form action="/save/{{ task['id'] }}" method="POST">
-            <textarea name="code" placeholder="Enter Python code here...">{{ code }}</textarea>
-            <div class="btn-group">
-                <button class="btn save" type="submit">Save</button>
-                <a href="/dashboard" class="btn">Cancel</a>
-            </div>
-        </form>
+
+<header>
+  <h1>⚡ Edit Code</h1>
+  <span class="tag">Task #{{ task.id }} — {{ task.name }}</span>
+</header>
+
+<div class="editor-wrap">
+  <p class="info">
+    Available context: <strong>stop_event</strong> (threading.Event) &nbsp;·&nbsp;
+    <strong>task.get_speed()</strong> &nbsp;·&nbsp;
+    <strong>task.load_progress()</strong> &nbsp;·&nbsp;
+    <strong>task.save_progress(n)</strong> &nbsp;·&nbsp;
+    <strong>task.update_total_batch(n)</strong> &nbsp;·&nbsp;
+    <strong>task.task_id</strong>
+  </p>
+  <form action="/save/{{ task.id }}" method="POST">
+    <textarea name="code" spellcheck="false">{{ code }}</textarea>
+    <div class="btn-row">
+      <button type="submit" class="btn btn-save">💾 Save</button>
+      <a href="/dashboard" class="btn btn-cancel">✕ Cancel</a>
     </div>
+  </form>
+</div>
+
 </body>
 </html>

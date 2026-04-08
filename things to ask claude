@@ -1,0 +1,12 @@
+1.is this code putting stress completely on cpu? if yes how to make use of gpu
+
+2.need to add below features
+intruder🔲 Listed, not builtBurp-style payload fuzzersqlinjection🔲 Listed, not builtSQLi detectionxss🔲 Listed, not builtXSS injection scannereyewitness🔲 Listed, not builtWeb screenshot / recon
+
+3.can we introduce proxy, repeater the same as burpsuite? i need to intercept requests like wireshark, i dont wanna miss a sigle packet, i will choose the adapter to listen as well, let the program list
+
+4.can i switch the workload happening locally to a remote server? just through a toggle button? i want it to vary for each task cause some i will run in local and some on aws server i own
+
+5. need to integrate proper hping3 -S -c 1 -p 443 google.com, or does my nmap effeciently send a syn packet to check if port is alive?
+
+6.can i build a collaborator like burpsuite, if i give creds of my remote server?

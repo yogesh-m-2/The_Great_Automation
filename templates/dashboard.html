@@ -1,322 +1,340 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - The Great Automation</title>
-    <style>
-        /* Add your CSS styles here */
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-        }
-        .container {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        h2 {
-            margin-top: 0;
-            text-align: center;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 8px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-            white-space: normal;
-        }
-        th {
-            background-color: #f2f2f2;
-            white-space: normal;
-        }
-        .status {
-            text-align: center;
-        }
-        .status.running {
-            color: green;
-        }
-        .status.paused {
-            color: orange;
-        }
-        .status.stopped {
-            color: red;
-        }
-        .btn-group {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .btn {
-            margin: 0 5px;
-            padding: 8px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .btn.start {
-            background-color: green;
-            color: white;
-        }
-        .btn.pause {
-            background-color: orange;
-            color: white;
-        }
-        .btn.stop {
-            background-color: red;
-            color: white;
-        }
-        .btn.restart {
-            background-color: blue;
-            color: white;
-        }
-        .btn.code {
-            background-color: #007bff;
-            color: white;
-        }
-        .btn.add-task {
-            background-color: #28a745;
-            color: white;
-            margin-bottom: 10px;
-        }
-        .btn.delete-task {
-            background-color: #dc3545;
-            color: white;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard – The Great Automation</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+    /* ── top bar ── */
+    header {
+      background: #1a1d27;
+      border-bottom: 1px solid #2d3148;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky; top: 0; z-index: 10;
+    }
+    header h1 { font-size: 1rem; font-weight: 600; color: #a78bfa; }
+    .cpu-badge {
+      font-size: .78rem; color: #94a3b8;
+      background: #0f1117; border: 1px solid #2d3148;
+      padding: 4px 10px; border-radius: 20px;
+    }
+    .logout { font-size: .78rem; color: #94a3b8; text-decoration: none; margin-left: 14px; }
+    .logout:hover { color: #f87171; }
+
+    /* ── toolbar ── */
+    .toolbar {
+      padding: 16px 24px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      border-bottom: 1px solid #2d3148;
+    }
+    select {
+      background: #1a1d27; border: 1px solid #2d3148;
+      color: #e2e8f0; padding: 7px 12px; border-radius: 7px;
+      font-size: .85rem; cursor: pointer; outline: none;
+    }
+    .btn {
+      padding: 7px 14px; border: none; border-radius: 7px;
+      font-size: .82rem; font-weight: 500; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-purple { background: #a78bfa; color: #0f1117; }
+    .btn-green  { background: #34d399; color: #0f1117; }
+    .btn-red    { background: #f87171; color: #0f1117; }
+    .btn-blue   { background: #60a5fa; color: #0f1117; }
+    .btn-orange { background: #fb923c; color: #0f1117; }
+    .btn-gray   { background: #475569; color: #e2e8f0; }
+    .btn-sm { padding: 4px 9px; font-size: .78rem; }
+
+    /* ── table ── */
+    .table-wrap { padding: 20px 24px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th {
+      text-align: left; padding: 10px 12px;
+      background: #1a1d27; color: #94a3b8;
+      border-bottom: 1px solid #2d3148;
+      font-weight: 500; white-space: nowrap;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #1e2235;
+      vertical-align: middle;
+    }
+    tr:hover td { background: #1a1d27; }
+
+    /* status pill */
+    .pill {
+      display: inline-block; padding: 2px 10px;
+      border-radius: 20px; font-size: .75rem; font-weight: 600;
+    }
+    .pill-running  { background: #064e3b; color: #34d399; }
+    .pill-stopped  { background: #450a0a; color: #f87171; }
+
+    /* progress bar */
+    .prog-wrap { width: 120px; background: #1e2235; border-radius: 20px; height: 7px; }
+    .prog-bar  { height: 7px; border-radius: 20px; background: #a78bfa; transition: width .4s; }
+    .prog-label { font-size: .75rem; color: #94a3b8; margin-top: 3px; }
+
+    /* speed control */
+    .speed-ctrl { display: flex; align-items: center; gap: 6px; }
+    .speed-ctrl span { min-width: 28px; text-align: center; font-weight: 600; }
+
+    /* actions */
+    .actions { display: flex; gap: 5px; flex-wrap: wrap; }
+
+    /* output modal */
+    #modal-bg {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #modal-bg.open { display: flex; }
+    #modal {
+      background: #1a1d27; border: 1px solid #2d3148;
+      border-radius: 12px; width: 90%; max-width: 800px;
+      max-height: 80vh; display: flex; flex-direction: column;
+    }
+    #modal-header {
+      padding: 14px 20px; border-bottom: 1px solid #2d3148;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    #modal-header span { font-weight: 600; color: #a78bfa; }
+    #modal-close { background: none; border: none; color: #94a3b8; font-size: 1.3rem; cursor: pointer; }
+    #modal-body {
+      padding: 16px 20px; overflow-y: auto; flex: 1;
+      font-family: 'Courier New', monospace; font-size: .8rem;
+      color: #94a3b8; white-space: pre-wrap; word-break: break-all;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h2>Task List</h2>
-        <!-- Dropdown menu -->
-        <label for="taskSelect">Select Task:</label>
-        <select id="taskSelect">
-            <option value="nmap">nmap</option>
-            <option value="httpx">httpx</option>
-            <option value="subfinder">subfinder</option>
-            <option value="intruder">intruder</option>
-            <option value="dirbuster">dirbuster</option>
-            <option value="sqlinjection">sqlinjection</option>
-            <option value="xss">xss injection</option>
-            <option value="eyewitness">eyewitness</option>
-        </select>
-        <!-- Add Task button for dropdown -->
-        <button class="btn add-task-dropdown" onclick="addnewtaskDropdown()">Add Task from Dropdown</button>
-        <!-- Add Task button as before -->
-        <button class="btn add-task" onclick="addnewtask()">Add Task</button>
-        <table>
-            <tr>
-                <!-- Table headers -->
-                <th>ID</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Progress</th>
-                <th>Speed</th>
-                <th>CPU Usage</th>
-                <th>Action</th>
-                <th>Delete</th>
-            </tr>
-            <!-- Task rows -->
-            {% for task in tasks %}
-            <tr>
-                <td>{{ task.id }}</td>
-                <td>{{ task.name }}<button class="btn view-file" onclick="viewFile('{{ task.id }}')">View File</button></td>
-                <td class="status {{ task.status.lower() }}">{{ task.status }}</td>
-                <td>{{ ((task.progress | int / task.total | int) * 100) }}%</td>
-                <td>
-                    <span id="speed_{{ task.id }}">
-                        <form action="/decrease-speed/{{ task.id }}" method="GET" style="display: inline-block;">
-                            <button class="btn decrease-speed">-</button>
-                        </form>
-                        {{ task.speed }}
-                        <form action="/increase-speed/{{ task.id }}" method="GET" style="display: inline-block;">
-                            <button class="btn increase-speed">+</button>
-                        </form>
-                    </span>
-                </td>
-                <td class="cpu">{{ task.cpu_usage }}</td>
-                <td class="btn-group">
-                    <!-- Action buttons -->
-                    <form action="/start/{{ task.id }}" method="GET">
-                        <button class="btn start">&#9654;</button>
-                    </form>
-                    <form action="/pause/{{ task.id }}" method="GET">
-                        <button class="btn pause">&#10073;&#10073;</button>
-                    </form>
-                    <form action="/stop/{{ task.id }}" method="GET">
-                        <button class="btn stop">&#9724;</button>
-                    </form>
-                    <form action="/restart/{{ task.id }}" method="POST">
-                        <button class="btn restart">&#8634;</button>
-                    </form>
-                    <form action="/edit/{{ task.id }}" method="GET">
-                        <button class="btn code">Edit Code</button>
-                    </form>
-                </td>
-                <td>
-                    <!-- Delete button -->
-                    <form action="/delete/{{ task.id }}" method="POST">
-                        <button class="btn delete-task">Delete</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </table>
+
+<header>
+  <h1>⚡ The Great Automation</h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="cpu-badge">CPU: <span id="cpu-val">—</span>%</span>
+    <a href="/logout" class="logout">Sign out</a>
+  </div>
+</header>
+
+<!-- ── toolbar ── -->
+<div class="toolbar">
+  <select id="toolSelect">
+    <option value="nmap">nmap</option>
+    <option value="dirbuster">dirbuster</option>
+    <option value="httpx">httpx</option>
+    <option value="subfinder">subfinder</option>
+  </select>
+  <button class="btn btn-purple" onclick="launchTool()">+ Add Tool Task</button>
+  <button class="btn btn-green"  onclick="addBlankTask()">+ Blank Task</button>
+</div>
+
+<!-- ── table ── -->
+<div class="table-wrap">
+  <table id="task-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Status</th>
+        <th>Progress</th>
+        <th>Speed</th>
+        <th>Actions</th>
+        <th>Output</th>
+        <th>Delete</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+      {% set total = [task.total | int, 1] | max %}
+      {% set pct   = ((task.progress | int / total) * 100) | round(1) %}
+      <tr id="row-{{ task.id }}">
+        <td>{{ task.id }}</td>
+        <td style="max-width:200px;word-break:break-all">{{ task.name }}</td>
+        <td>
+          <span class="pill pill-{{ task.status | lower }}" id="status-{{ task.id }}">
+            {{ task.status }}
+          </span>
+        </td>
+        <td>
+          <div class="prog-wrap">
+            <div class="prog-bar" id="bar-{{ task.id }}" style="width:{{ pct }}%"></div>
+          </div>
+          <div class="prog-label" id="pct-{{ task.id }}">{{ pct }}%</div>
+        </td>
+        <td>
+          <div class="speed-ctrl">
+            <form action="/decrease-speed/{{ task.id }}" method="GET" style="margin:0">
+              <button class="btn btn-gray btn-sm" type="submit">−</button>
+            </form>
+            <span id="speed-{{ task.id }}">{{ task.speed }}</span>
+            <form action="/increase-speed/{{ task.id }}" method="GET" style="margin:0">
+              <button class="btn btn-gray btn-sm" type="submit">+</button>
+            </form>
+          </div>
+        </td>
+        <td>
+          <div class="actions">
+            <a href="/start/{{ task.id }}"><button class="btn btn-green  btn-sm">▶</button></a>
+            <a href="/stop/{{ task.id }}"><button  class="btn btn-red    btn-sm">■</button></a>
+            <form action="/restart/{{ task.id }}" method="POST" style="margin:0">
+              <button class="btn btn-blue btn-sm" type="submit">↺</button>
+            </form>
+            <a href="/edit/{{ task.id }}"><button class="btn btn-orange btn-sm">✎ Code</button></a>
+          </div>
+        </td>
+        <td>
+          <button class="btn btn-gray btn-sm" onclick="viewFile({{ task.id }})">View</button>
+        </td>
+        <td>
+          <form action="/delete/{{ task.id }}" method="POST" style="margin:0"
+                onsubmit="return confirm('Delete task {{ task.id }}?')">
+            <button class="btn btn-red btn-sm" type="submit">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ── output modal ── -->
+<div id="modal-bg">
+  <div id="modal">
+    <div id="modal-header">
+      <span id="modal-title">Output</span>
+      <button id="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <script>
-    
-    function addnewtask() {
-    // Open a prompt to get the task name from the user
-    const taskName = prompt("Enter task name:");
-    
-    // Check if the user entered a name
-    if (taskName) {
-        // Create a new XMLHttpRequest object
-        const xhr = new XMLHttpRequest();
+    <div id="modal-body">Loading…</div>
+  </div>
+</div>
 
-        // Set up the POST request
-        xhr.open("POST", "/add-task", true);
-        xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+<script>
+// ── live polling ─────────────────────────────────────────────────────────────
+setInterval(() => {
+  fetch('/task-status').then(r => r.json()).then(data => {
+    data.forEach(t => {
+      const s = document.getElementById('status-' + t.id);
+      const b = document.getElementById('bar-'    + t.id);
+      const p = document.getElementById('pct-'    + t.id);
+      const sp= document.getElementById('speed-'  + t.id);
+      if (s) {
+        s.textContent = t.status;
+        s.className = 'pill pill-' + t.status.toLowerCase();
+      }
+      if (b) b.style.width = t.progress + '%';
+      if (p) p.textContent  = t.progress + '%';
+      if (sp) sp.textContent = t.speed;
+    });
+  }).catch(() => {});
+}, 2000);
 
-        // Set up the callback function to handle the response
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    // Request was successful
-                    console.log("Task added successfully!");
-                } else {
-                    // Request failed
-                    console.error("Failed to add task. Status code: " + xhr.status);
-                }
-            }
-        };
+setInterval(() => {
+  fetch('/cpu-usage').then(r => r.json()).then(d => {
+    document.getElementById('cpu-val').textContent = d.cpu_usage;
+  }).catch(() => {});
+}, 3000);
 
-        // Send the POST request with the task name as data
-        xhr.send("name=" + encodeURIComponent(taskName));
-        window.location.href = "/dashboard";
-    }
-}
-function do_nmap() {
-    var ipAddress = prompt("Please enter the IP address:");
-    if (ipAddress === null || ipAddress === "") {
-        return; // Exit if user cancels or inputs empty string
-    }
-
-    var useAllPorts = confirm("Do you want to scan all ports? Click OK for yes, or Cancel for a range of ports.");
-
-    var portInfo;
-    if (useAllPorts) {
-        portInfo = "all_ports=true";
-    } else {
-        var startPort = parseInt(prompt("Please enter the start port:"));
-        var endPort = parseInt(prompt("Please enter the end port:"));
-        portInfo = "start_port=" + encodeURIComponent(startPort) + "&end_port=" + encodeURIComponent(endPort);
-    }
-
-    var urlEncodedParams = "ip=" + encodeURIComponent(ipAddress) + "&" + portInfo;
-    
-    var xhr = new XMLHttpRequest();
-    xhr.open("POST", "/nmap", true);
-    xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4 && xhr.status === 200) {
-            window.location.href = "/dashboard";
-        }
-    };
-    xhr.send(urlEncodedParams);
+// ── blank task ───────────────────────────────────────────────────────────────
+function addBlankTask() {
+  const name = prompt('Task name:');
+  if (!name) return;
+  const form = new FormData();
+  form.append('name', name);
+  fetch('/add-task', { method: 'POST', body: form })
+    .then(() => location.reload());
 }
 
-function do_dirbuster(){
-    var url = prompt("Please enter the URL:");
-    if (!url) {
-        // If user cancels or inputs an empty string, exit
-        return;
-    }
-
-    // Regular expression to check if the URL format is valid
-    var urlRegex = /^(http|https):\/\/[^ "]+$/;
-
-    if (!urlRegex.test(url)) {
-        alert("Error: Invalid URL format. Please enter a valid URL starting with http:// or https://");
-        return;
-    }
-
-    var excludeStatusCodes = prompt("Please enter the status codes to exclude (if any), separated by commas:");
-    // Validate the exclude status codes (if provided)
-    if (excludeStatusCodes !== null) {
-        var statusCodeArray = excludeStatusCodes.split(",").map(function(code) {
-            return code.trim();
-        });
-        for (var i = 0; i < statusCodeArray.length; i++) {
-            if (!(/^\d+$/.test(statusCodeArray[i]))) {
-                alert("Error: Invalid status code format. Please enter numeric values separated by commas.");
-                return;
-            }
-        }
-    }
-
-    var xhr = new XMLHttpRequest();
-    xhr.open("POST", "/dirbuster", true);
-    xhr.setRequestHeader("Content-type", "application/json");
-    xhr.onreadystatechange = function() {
-        if (xhr.readyState === 4 && xhr.status === 200) {
-            window.location.href = "/dashboard";
-        }
-    };
-
-    // Construct the data to send
-    var requestData = {
-        "url": url,
-        "excludedstatuscodes": statusCodeArray
-    };
-    xhr.send(JSON.stringify(requestData));
+// ── tool launcher ────────────────────────────────────────────────────────────
+function launchTool() {
+  const tool = document.getElementById('toolSelect').value;
+  switch (tool) {
+    case 'nmap':       doNmap();      break;
+    case 'dirbuster':  doDirbuster(); break;
+    case 'httpx':      doHttpx();     break;
+    case 'subfinder':  doSubfinder(); break;
+  }
 }
 
+function doNmap() {
+  const ip = prompt('Target IP / hostname:');
+  if (!ip) return;
+  const all = confirm('Scan ALL ports (0-65535)?\nCancel = enter a range');
+  let body;
+  if (all) {
+    body = 'ip=' + encodeURIComponent(ip) + '&all_ports=true';
+  } else {
+    const s = prompt('Start port:', '1');
+    const e = prompt('End port:', '1024');
+    if (!s || !e) return;
+    body = 'ip=' + encodeURIComponent(ip) + '&start_port=' + s + '&end_port=' + e;
+  }
+  fetch('/nmap', { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body })
+    .then(() => location.reload());
+}
 
-        function addnewtaskDropdown() {
-            const selectedTask = document.getElementById("taskSelect").value;
-            switch(selectedTask) {
-        case 'nmap':
-            do_nmap()
-            break;
-        case 'dirbuster':
-            do_dirbuster()
-            break;
-        
-        default:
-            console.log(selectedTask)
-    }
-        
-            
-        }
-    function viewFile(taskId) {
-        // Send an XMLHttpRequest to fetch the file content
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", `/file_${taskId}`, true);
-        xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE) {
-                if (xhr.status === 200) {
-                    // File content received successfully
-                    const fileContent = xhr.responseText;
+function doDirbuster() {
+  const url = prompt('Target URL (include http:// or https://):');
+  if (!url || !/^https?:\/\/.+/.test(url)) { alert('Invalid URL'); return; }
+  const ex = prompt('Status codes to EXCLUDE (comma-separated, e.g. 404,403):', '404');
+  const codes = ex ? ex.split(',').map(c => c.trim()).filter(Boolean) : [];
+  fetch('/dirbuster', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ url, excludedstatuscodes: codes })
+  }).then(() => location.reload());
+}
 
-                    // Open a new popup window to display the file content
-                    const fileWindow = window.open("", "File Content", "width=600,height=400");
-                    fileWindow.document.write(`<pre>${fileContent}</pre>`);
-                } else {
-                    // Failed to fetch file content
-                    console.error(`Failed to fetch file for task ${taskId}. Status code: ${xhr.status}`);
-                }
-            }
-        };
-        xhr.send();
-    }
-    </script>
+function doHttpx() {
+  const raw = prompt('Targets (one per line — hostname, IP, or URL):');
+  if (!raw) return;
+  fetch('/httpx', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ targets: raw })
+  }).then(() => location.reload());
+}
+
+function doSubfinder() {
+  const domain = prompt('Root domain (e.g. example.com):');
+  if (!domain) return;
+  fetch('/subfinder', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ domain })
+  }).then(() => location.reload());
+}
+
+// ── output modal ─────────────────────────────────────────────────────────────
+function viewFile(id) {
+  document.getElementById('modal-title').textContent = 'Output — Task ' + id;
+  document.getElementById('modal-body').textContent = 'Loading…';
+  document.getElementById('modal-bg').classList.add('open');
+  fetch('/file_' + id)
+    .then(r => r.text())
+    .then(t => { document.getElementById('modal-body').textContent = t || '(empty)'; })
+    .catch(() => { document.getElementById('modal-body').textContent = 'No output yet.'; });
+}
+function closeModal() {
+  document.getElementById('modal-bg').classList.remove('open');
+}
+document.getElementById('modal-bg').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal-bg')) closeModal();
+});
+</script>
 </body>
 </html>
-

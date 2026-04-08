@@ -1,0 +1,62 @@
+import socket
+import threading
+import time
+import requests
+
+domain = "domain_goes_here"
+
+# wordlist pulled from SecLists (small-medium, ~2k common subdomains)
+wordlist_url = "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-5000.txt"
+try:
+    wordlist = requests.get(wordlist_url, timeout=15).text.splitlines()
+    wordlist = [w.strip() for w in wordlist if w.strip() and not w.startswith("#")]
+except Exception:
+    wordlist = [
+        "www","mail","ftp","localhost","webmail","smtp","pop","ns1","ns2",
+        "blog","dev","staging","api","cdn","static","admin","cpanel","whm",
+        "autodiscover","autoconfig","m","mobile","shop","vpn","remote","test",
+        "beta","portal","secure","app","support","help","status","monitor",
+        "dashboard","git","gitlab","jenkins","jira","confluence","wiki",
+    ]
+
+batch_size = max(1, len(wordlist) // 20)
+start_index = int(task.load_progress())
+task.update_total_batch(len(wordlist))
+
+
+class SubfinderThread(threading.Thread):
+    def __init__(self, sub):
+        super().__init__()
+        self.sub = sub
+        self.daemon = True
+
+    def run(self):
+        if stop_event.is_set():
+            return
+        fqdn = f"{self.sub}.{domain}"
+        try:
+            results = socket.getaddrinfo(fqdn, None)
+            ips = list({r[4][0] for r in results})
+            line = f"{fqdn}  ->  {', '.join(ips)}\n"
+            with open(f"file_{task.task_id}", "a") as f:
+                f.write(line)
+        except socket.gaierror:
+            pass  # NXDOMAIN — subdomain doesn't exist
+        except Exception:
+            pass
+
+
+def count_threads():
+    return sum(1 for t in threading.enumerate() if isinstance(t, SubfinderThread))
+
+
+for i in range(start_index, len(wordlist), batch_size):
+    batch = wordlist[i:i + batch_size]
+    for sub in batch:
+        while count_threads() >= int(task.get_speed()):
+            time.sleep(0.5)
+        if stop_event.is_set():
+            break
+        SubfinderThread(sub).start()
+    if not stop_event.is_set():
+        task.save_progress(i + batch_size)

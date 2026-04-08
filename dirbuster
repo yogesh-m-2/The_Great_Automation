@@ -1,59 +1,81 @@
-import time
-import threading
-import requests
 import socket
+import ssl
+import threading
+import time
+import requests
 
-class Dirbuster(threading.Thread):
-    def __init__(self,word):
-        super(Dirbuster, self).__init__()
-        self.word = word
-        self.input_url = "url_goes_here"
-        self.host = self.input_url.split('//')[-1].split('/')[0]
-        self.security = self.input_url.split('://')[0]
-    
-    def run(self):
-      if not stop_event.is_set():
-        try:
-          s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-          s.settimeout(5)  # Adjust timeout as needed
-          print(self.security == 'https')
-          s.connect((self.host, 443)) if self.security == 'https' else s.connect((self.host, 80))
-          s.sendall(f"HEAD /{self.word} HTTP/1.1\r\nHost: {self.host}\r\nConnection: close\r\n\r\n".encode())
-          response = s.recv(4096).decode()
-          status_code = int(response.split()[1])
-          if str(status_code) not in array_status_code:
-            with open(f'file_{task.task_id}', 'a') as f:
-              f.write(f"{self.host}/{self.word} {status_code}\n")
-          s.close()
-        except Exception as e:
-          print(e)
-          pass
- 
+input_url = "url_goes_here"
+excluded = array_status_code  # list injected by server
 
-   
-def count_thread():
-    count=0  
-    for thread in threading.enumerate():
-      if isinstance(thread, Dirbuster):
-            count += 1
-    return count
-
+host = input_url.split("//")[-1].split("/")[0]
+scheme = input_url.split("://")[0].lower()
+port = 443 if scheme == "https" else 80
 
 wordlist_url = "https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt"
-response = requests.get(wordlist_url)
-wordlist = response.text.splitlines()
+wordlist = requests.get(wordlist_url, timeout=15).text.splitlines()
+wordlist = [w for w in wordlist if w.strip() and not w.startswith("#")]
+
 batch_size = max(1, len(wordlist) // 20)
 start_index = int(task.load_progress())
 task.update_total_batch(len(wordlist))
 
+
+class DirbusterThread(threading.Thread):
+    def __init__(self, word):
+        super().__init__()
+        self.word = word
+        self.daemon = True
+
+    def run(self):
+        if stop_event.is_set():
+            return
+        try:
+            raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            raw.settimeout(5)
+            raw.connect((host, port))
+
+            if scheme == "https":
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                s = ctx.wrap_socket(raw, server_hostname=host)
+            else:
+                s = raw
+
+            req = (
+                f"HEAD /{self.word} HTTP/1.1\r\n"
+                f"Host: {host}\r\n"
+                f"User-Agent: Mozilla/5.0\r\n"
+                f"Connection: close\r\n\r\n"
+            )
+            s.sendall(req.encode())
+            response = s.recv(1024).decode("utf-8", errors="ignore")
+            s.close()
+
+            parts = response.split()
+            if len(parts) < 2:
+                return
+            status = parts[1]
+
+            if status not in [str(c) for c in excluded]:
+                line = f"{scheme}://{host}/{self.word}  [{status}]\n"
+                with open(f"file_{task.task_id}", "a") as f:
+                    f.write(line)
+        except Exception:
+            pass
+
+
+def count_threads():
+    return sum(1 for t in threading.enumerate() if isinstance(t, DirbusterThread))
+
+
 for i in range(start_index, len(wordlist), batch_size):
-  batch = wordlist[i:i+batch_size]
-  for word in batch:
-    while count_thread() >= int(task.get_speed()):
-        time.sleep(1)
-    if stop_event.is_set():
-        break
-    t = Dirbuster(word)
-    t.start()
-  if not stop_event.is_set():
+    batch = wordlist[i:i + batch_size]
+    for word in batch:
+        while count_threads() >= int(task.get_speed()):
+            time.sleep(0.5)
+        if stop_event.is_set():
+            break
+        DirbusterThread(word).start()
+    if not stop_event.is_set():
         task.save_progress(i + batch_size)

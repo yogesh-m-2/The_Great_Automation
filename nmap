@@ -2,47 +2,60 @@ import socket
 import threading
 import time
 
-start_index = int(task.load_progress()) if task.load_progress() else 0
-# Define the target host and ports to scan
 target_host = "ip_goes_here"
 target_ports = range(start_range, end_range)
 batch_size = max(1, len(target_ports) // 20)
+start_index = int(task.load_progress())
 task.update_total_batch(len(target_ports))
 
-class TaskThread(threading.Thread):
+
+class NmapThread(threading.Thread):
     def __init__(self, port):
-        super(TaskThread, self).__init__()
+        super().__init__()
         self.port = port
+        self.daemon = True
 
     def run(self):
-        if not stop_event.is_set():
-            # Scan the port
-            try:
-                with open(f'file_{task.task_id}', 'a') as f:
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    sock.settimeout(2)  # Adjust timeout as needed
-                    result = sock.connect_ex((target_host, self.port))
-                    if result == 0:
-                        f.write(str(self.port)+"\n")
-                    sock.close()
-            except Exception as e:
-                print(f"Error scanning port {self.port}: {str(e)}")
+        if stop_event.is_set():
+            return
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)
+            result = sock.connect_ex((target_host, self.port))
+            sock.close()
+            if result == 0:
+                # try banner grab
+                banner = ""
+                try:
+                    sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    sock2.settimeout(2)
+                    sock2.connect((target_host, self.port))
+                    sock2.sendall(b"HEAD / HTTP/1.0\r\n\r\n")
+                    raw = sock2.recv(256).decode("utf-8", errors="ignore").split("\r\n")[0]
+                    banner = raw.strip()
+                    sock2.close()
+                except Exception:
+                    pass
+                line = f"{target_host}:{self.port}/tcp  OPEN"
+                if banner:
+                    line += f"  [{banner[:80]}]"
+                with open(f"file_{task.task_id}", "a") as f:
+                    f.write(line + "\n")
+        except Exception:
+            pass
 
-def count_task_threads():
-    count = 0
-    for thread in threading.enumerate():
-        if isinstance(thread, TaskThread):
-            count += 1
-    return count
+
+def count_threads():
+    return sum(1 for t in threading.enumerate() if isinstance(t, NmapThread))
+
 
 for i in range(start_index, len(target_ports), batch_size):
-    batch = target_ports[i:i+batch_size]
+    batch = list(target_ports)[i:i + batch_size]
     for port in batch:
-        while count_task_threads() >= int(task.get_speed()):
-            time.sleep(1)
+        while count_threads() >= int(task.get_speed()):
+            time.sleep(0.5)
         if stop_event.is_set():
             break
-        t = TaskThread(port)
-        t.start()
+        NmapThread(port).start()
     if not stop_event.is_set():
         task.save_progress(i + batch_size)

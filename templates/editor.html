@@ -24,8 +24,14 @@
       flex: 1; display: flex; flex-direction: column;
       padding: 20px 24px; gap: 12px;
     }
-    .info { font-size: .82rem; color: #94a3b8; }
+    .info {
+      font-size: .82rem; color: #94a3b8;
+      background: #1a1d27; border: 1px solid #2d3148;
+      border-radius: 8px; padding: 10px 14px; line-height: 1.8;
+    }
     .info strong { color: #a78bfa; }
+    .info code { font-family: 'Courier New', monospace; font-size: .82rem;
+                 background: #0f1117; padding: 1px 5px; border-radius: 4px; }
 
     form { display: flex; flex-direction: column; flex: 1; gap: 12px; }
 
@@ -61,14 +67,19 @@
 </header>
 
 <div class="editor-wrap">
-  <p class="info">
-    Available context: <strong>stop_event</strong> (threading.Event) &nbsp;·&nbsp;
-    <strong>task.get_speed()</strong> &nbsp;·&nbsp;
-    <strong>task.load_progress()</strong> &nbsp;·&nbsp;
-    <strong>task.save_progress(n)</strong> &nbsp;·&nbsp;
-    <strong>task.update_total_batch(n)</strong> &nbsp;·&nbsp;
-    <strong>task.task_id</strong>
-  </p>
+  <div class="info">
+    <strong>Available context variables &amp; methods:</strong><br>
+    <code>stop_event</code> — threading.Event; check <code>stop_event.is_set()</code> to respect stop button &nbsp;·&nbsp;
+    <code>task.get_speed()</code> — returns current speed as string; cast to int &nbsp;·&nbsp;
+    <code>task.load_progress()</code> — returns saved progress as string; cast to int &nbsp;·&nbsp;
+    <code>task.save_progress(n)</code> — save current batch index (writes to memory, flushes to CSV every 5 calls) &nbsp;·&nbsp;
+    <code>task.update_total_batch(n)</code> — set total items count &nbsp;·&nbsp;
+    <code>task.task_id</code> — integer task ID (use in output filenames e.g. <code>f"file_{task.task_id}"</code>)<br><br>
+    <strong>Speed-controlled threading (recommended):</strong><br>
+    Instead of <code>while count_threads() &gt;= speed: time.sleep(1)</code>, use the semaphore:<br>
+    Call <code>task.acquire_slot()</code> before starting a worker thread and <code>task.release_slot()</code>
+    at the end of the worker's <code>run()</code>. Speed changes take effect immediately with zero busy-wait.
+  </div>
   <form action="/save/{{ task.id }}" method="POST">
     <textarea name="code" spellcheck="false">{{ code }}</textarea>
     <div class="btn-row">

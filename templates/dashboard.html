@@ -83,6 +83,8 @@
     }
     .pill-running  { background: #064e3b; color: #34d399; }
     .pill-stopped  { background: #450a0a; color: #f87171; }
+    .pill-done     { background: #1e3a5f; color: #60a5fa; }
+    .pill-error    { background: #4a1942; color: #f0abfc; }
 
     /* progress bar */
     .prog-wrap { width: 120px; background: #1e2235; border-radius: 20px; height: 7px; }
@@ -119,6 +121,10 @@
       font-family: 'Courier New', monospace; font-size: .8rem;
       color: #94a3b8; white-space: pre-wrap; word-break: break-all;
     }
+    #modal-footer {
+      padding: 10px 20px; border-top: 1px solid #2d3148;
+      display: flex; justify-content: flex-end; gap: 8px;
+    }
   </style>
 </head>
 <body>
@@ -141,7 +147,29 @@
   </select>
   <button class="btn btn-purple" onclick="launchTool()">+ Add Tool Task</button>
   <button class="btn btn-green"  onclick="addBlankTask()">+ Blank Task</button>
+  <div style="margin-left:auto">
+    <a href="/intruder" style="text-decoration:none">
+      <button class="btn btn-orange" style="font-weight:600;">⚔ Intruder</button>
+    </a>
+  </div>
 </div>
+
+<!-- ── flash messages ── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div style="padding:10px 24px; display:flex; flex-direction:column; gap:6px;">
+      {% for category, message in messages %}
+        <div style="
+          background: {% if category == 'warning' %}#451a03{% else %}#064e3b{% endif %};
+          border: 1px solid {% if category == 'warning' %}#fb923c{% else %}#34d399{% endif %};
+          color: {% if category == 'warning' %}#fb923c{% else %}#34d399{% endif %};
+          border-radius: 7px; padding: 8px 14px; font-size: .82rem;">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
 
 <!-- ── table ── -->
 <div class="table-wrap">
@@ -164,7 +192,7 @@
       {% set pct   = ((task.progress | int / total) * 100) | round(1) %}
       <tr id="row-{{ task.id }}">
         <td>{{ task.id }}</td>
-        <td style="max-width:200px;word-break:break-all">{{ task.name }}</td>
+        <td style="max-width:200px;word-break:break-all">{{ task.name | e }}</td>
         <td>
           <span class="pill pill-{{ task.status | lower }}" id="status-{{ task.id }}">
             {{ task.status }}
@@ -220,18 +248,24 @@
       <button id="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div id="modal-body">Loading…</div>
+    <div id="modal-footer">
+      <button class="btn btn-gray btn-sm" id="modal-refresh-btn">↻ Refresh</button>
+      <button class="btn btn-gray btn-sm" onclick="closeModal()">Close</button>
+    </div>
   </div>
 </div>
 
 <script>
-// ── live polling ─────────────────────────────────────────────────────────────
+let _currentModalTaskId = null;
+
+// ── live polling ──────────────────────────────────────────────────────────────
 setInterval(() => {
   fetch('/task-status').then(r => r.json()).then(data => {
     data.forEach(t => {
-      const s = document.getElementById('status-' + t.id);
-      const b = document.getElementById('bar-'    + t.id);
-      const p = document.getElementById('pct-'    + t.id);
-      const sp= document.getElementById('speed-'  + t.id);
+      const s  = document.getElementById('status-' + t.id);
+      const b  = document.getElementById('bar-'    + t.id);
+      const p  = document.getElementById('pct-'    + t.id);
+      const sp = document.getElementById('speed-'  + t.id);
       if (s) {
         s.textContent = t.status;
         s.className = 'pill pill-' + t.status.toLowerCase();
@@ -249,7 +283,7 @@ setInterval(() => {
   }).catch(() => {});
 }, 3000);
 
-// ── blank task ───────────────────────────────────────────────────────────────
+// ── blank task ────────────────────────────────────────────────────────────────
 function addBlankTask() {
   const name = prompt('Task name:');
   if (!name) return;
@@ -259,7 +293,7 @@ function addBlankTask() {
     .then(() => location.reload());
 }
 
-// ── tool launcher ────────────────────────────────────────────────────────────
+// ── tool launcher ─────────────────────────────────────────────────────────────
 function launchTool() {
   const tool = document.getElementById('toolSelect').value;
   switch (tool) {
@@ -319,19 +353,35 @@ function doSubfinder() {
   }).then(() => location.reload());
 }
 
-// ── output modal ─────────────────────────────────────────────────────────────
-function viewFile(id) {
-  document.getElementById('modal-title').textContent = 'Output — Task ' + id;
+// ── output modal ──────────────────────────────────────────────────────────────
+function loadModalContent(id) {
   document.getElementById('modal-body').textContent = 'Loading…';
-  document.getElementById('modal-bg').classList.add('open');
   fetch('/file_' + id)
     .then(r => r.text())
-    .then(t => { document.getElementById('modal-body').textContent = t || '(empty)'; })
+    .then(t => {
+      const body = document.getElementById('modal-body');
+      body.textContent = t || '(empty)';
+      body.scrollTop = body.scrollHeight; // scroll to bottom
+    })
     .catch(() => { document.getElementById('modal-body').textContent = 'No output yet.'; });
 }
+
+function viewFile(id) {
+  _currentModalTaskId = id;
+  document.getElementById('modal-title').textContent = 'Output — Task ' + id;
+  document.getElementById('modal-bg').classList.add('open');
+  loadModalContent(id);
+}
+
+document.getElementById('modal-refresh-btn').addEventListener('click', () => {
+  if (_currentModalTaskId !== null) loadModalContent(_currentModalTaskId);
+});
+
 function closeModal() {
   document.getElementById('modal-bg').classList.remove('open');
+  _currentModalTaskId = null;
 }
+
 document.getElementById('modal-bg').addEventListener('click', e => {
   if (e.target === document.getElementById('modal-bg')) closeModal();
 });

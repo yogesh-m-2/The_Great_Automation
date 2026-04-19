@@ -82,47 +82,48 @@ class HttpxThread(threading.Thread):
         self.daemon = True
 
     def run(self):
-        if stop_event.is_set():
-            return
-
-        t = self.target
-        if "://" in t:
-            scheme = t.split("://")[0].lower()
-            rest = t.split("://")[1]
-            schemes = [scheme]
-        else:
-            rest = t
-            schemes = ["http", "https"]
-
-        host_part = rest.split("/")[0]
-        if ":" in host_part:
-            host, port_s = host_part.rsplit(":", 1)
-            default_ports = {s: int(port_s) for s in schemes}
-        else:
-            host = host_part
-            default_ports = {"http": 80, "https": 443}
-
-        results = []
-        for scheme in schemes:
+        try:
             if stop_event.is_set():
-                break
-            results.append(probe(scheme, host, default_ports[scheme]))
+                return
 
-        if results:
-            with open(f"file_{task.task_id}", "a") as f:
-                f.write("\n".join(results) + "\n")
+            t = self.target
+            if "://" in t:
+                scheme = t.split("://")[0].lower()
+                rest = t.split("://")[1]
+                schemes = [scheme]
+            else:
+                rest = t
+                schemes = ["http", "https"]
 
+            host_part = rest.split("/")[0]
+            if ":" in host_part:
+                host, port_s = host_part.rsplit(":", 1)
+                default_ports = {s: int(port_s) for s in schemes}
+            else:
+                host = host_part
+                default_ports = {"http": 80, "https": 443}
 
-def count_threads():
-    return sum(1 for t in threading.enumerate() if isinstance(t, HttpxThread))
+            results = []
+            for scheme in schemes:
+                if stop_event.is_set():
+                    break
+                results.append(probe(scheme, host, default_ports[scheme]))
+
+            if results:
+                with open(f"file_{task.task_id}", "a") as f:
+                    f.write("\n".join(results) + "\n")
+        finally:
+            task.release_slot()
 
 
 for i in range(start_index, len(targets), batch_size):
     batch = targets[i:i + batch_size]
     for target in batch:
-        while count_threads() >= int(task.get_speed()):
-            time.sleep(0.5)
         if stop_event.is_set():
+            break
+        task.acquire_slot()
+        if stop_event.is_set():
+            task.release_slot()
             break
         HttpxThread(target).start()
     if not stop_event.is_set():

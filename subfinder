@@ -5,7 +5,6 @@ import requests
 
 domain = "domain_goes_here"
 
-# wordlist pulled from SecLists (small-medium, ~2k common subdomains)
 wordlist_url = "https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/subdomains-top1million-5000.txt"
 try:
     wordlist = requests.get(wordlist_url, timeout=15).text.splitlines()
@@ -31,31 +30,32 @@ class SubfinderThread(threading.Thread):
         self.daemon = True
 
     def run(self):
-        if stop_event.is_set():
-            return
-        fqdn = f"{self.sub}.{domain}"
         try:
-            results = socket.getaddrinfo(fqdn, None)
-            ips = list({r[4][0] for r in results})
-            line = f"{fqdn}  ->  {', '.join(ips)}\n"
-            with open(f"file_{task.task_id}", "a") as f:
-                f.write(line)
-        except socket.gaierror:
-            pass  # NXDOMAIN — subdomain doesn't exist
-        except Exception:
-            pass
-
-
-def count_threads():
-    return sum(1 for t in threading.enumerate() if isinstance(t, SubfinderThread))
+            if stop_event.is_set():
+                return
+            fqdn = f"{self.sub}.{domain}"
+            try:
+                results = socket.getaddrinfo(fqdn, None)
+                ips = list({r[4][0] for r in results})
+                line = f"{fqdn}  ->  {', '.join(ips)}\n"
+                with open(f"file_{task.task_id}", "a") as f:
+                    f.write(line)
+            except socket.gaierror:
+                pass
+            except Exception:
+                pass
+        finally:
+            task.release_slot()
 
 
 for i in range(start_index, len(wordlist), batch_size):
     batch = wordlist[i:i + batch_size]
     for sub in batch:
-        while count_threads() >= int(task.get_speed()):
-            time.sleep(0.5)
         if stop_event.is_set():
+            break
+        task.acquire_slot()
+        if stop_event.is_set():
+            task.release_slot()
             break
         SubfinderThread(sub).start()
     if not stop_event.is_set():

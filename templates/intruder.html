@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intruder – The Great Automation</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+    :root {
+      --bg:       #0b0d14;
+      --s1:       #111420;
+      --s2:       #161a2c;
+      --s3:       #1c2138;
+      --border:   #252a45;
+      --border2:  #1e2340;
+      --accent:   #e8522a;
+      --accent2:  #ff6b3d;
+      --green:    #3dd68c;
+      --blue:     #4fa8e8;
+      --yellow:   #f0b429;
+      --purple:   #a78bfa;
+      --red:      #f87171;
+      --text:     #dde3f5;
+      --muted:    #6b7494;
+      --muted2:   #8891b8;
+      --marker:   #e8522a;
+      --marker-bg:#3a1a0e;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--s1);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .logo { font-size: .95rem; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+    .page-title { font-size: .82rem; color: var(--muted2); border-left: 1px solid var(--border); padding-left: 14px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      background: var(--s1);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .tab {
+      padding: 9px 16px;
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── Layout ── */
+    .main-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      height: calc(100vh - 96px);
+    }
+
+    /* ── Left panel (request editor + target) ── */
+    .left-panel {
+      width: 52%;
+      min-width: 400px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* ── Right panel (config) ── */
+    .right-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    /* ── Section ── */
+    .section {
+      border-bottom: 1px solid var(--border2);
+      padding: 14px 18px;
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .section-icon {
+      width: 16px; height: 16px;
+      border: 1px solid var(--muted);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .62rem; color: var(--muted); cursor: default;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .section-desc {
+      font-size: .76rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    /* ── Target bar ── */
+    .target-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .target-label { font-size: .75rem; color: var(--muted); white-space: nowrap; font-weight: 500; }
+    .target-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      padding: 5px 10px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .target-input:focus { border-color: var(--accent); }
+
+    /* ── Request editor toolbar ── */
+    .editor-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .editor-toolbar-label {
+      font-size: .72rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-right: 4px;
+    }
+
+    /* ── Request textarea ── */
+    .request-wrap {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      min-height: 0;
+    }
+    #requestEditor {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      border: none;
+      color: #c9d1f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem;
+      line-height: 1.65;
+      padding: 14px 16px;
+      resize: none;
+      outline: none;
+      tab-size: 4;
+      position: relative;
+      z-index: 2;
+      caret-color: var(--accent2);
+    }
+    #requestOverlay { display: none; }
+    .marker-highlight {
+      background: var(--marker-bg);
+      color: var(--accent2);
+      border-radius: 2px;
+      outline: 1px solid var(--accent);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--s3);
+      color: var(--text);
+      font-size: .78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .12s, border-color .12s, color .12s;
+      white-space: nowrap;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+    .btn:hover { background: var(--s2); border-color: var(--muted); }
+    .btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    .btn-accent:hover { background: var(--accent2); border-color: var(--accent2); }
+    .btn-green { background: #0d3322; border-color: var(--green); color: var(--green); }
+    .btn-green:hover { background: #0f3f29; }
+    .btn-red { background: #2d1111; border-color: var(--red); color: var(--red); }
+    .btn-red:hover { background: #3a1515; }
+    .btn-sm { padding: 3px 9px; font-size: .73rem; }
+    .btn-lg { padding: 8px 22px; font-size: .85rem; font-weight: 600; }
+
+    /* ── Form rows ── */
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .form-label { font-size: .78rem; color: var(--muted2); min-width: 90px; flex-shrink: 0; }
+    select, .form-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: .78rem;
+      padding: 5px 10px;
+      outline: none;
+      font-family: 'IBM Plex Sans', sans-serif;
+      transition: border-color .15s;
+    }
+    select { cursor: pointer; min-width: 140px; }
+    select:focus, .form-input:focus { border-color: var(--accent); }
+    .form-stat { font-size: .78rem; color: var(--muted2); }
+    .form-stat span { color: var(--yellow); font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Payload list area ── */
+    .payload-area {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .payload-list-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+    #payloadList {
+      width: 100%;
+      height: 140px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      padding: 8px 10px;
+      resize: none;
+      outline: none;
+      line-height: 1.6;
+    }
+    #payloadList:focus { border-color: var(--accent); }
+    .payload-btn-col {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .payload-add-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 7px;
+      align-items: center;
+    }
+    #newPayloadInput {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      padding: 5px 10px;
+      outline: none;
+    }
+    #newPayloadInput:focus { border-color: var(--accent); }
+    #newPayloadInput::placeholder { color: var(--muted); font-style: italic; }
+    .add-from-list {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--muted2);
+      font-size: .78rem;
+      padding: 5px 10px;
+      cursor: pointer;
+      margin-top: 6px;
+      outline: none;
+    }
+    .add-from-list:focus { border-color: var(--accent); }
+
+    /* Numbers/runtime type UI */
+    .numbers-config { display: none; flex-direction: column; gap: 8px; }
+    .numbers-config.visible { display: flex; }
+    .numbers-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .num-input {
+      width: 80px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      padding: 5px 8px;
+      outline: none;
+      text-align: right;
+    }
+    .num-input:focus { border-color: var(--accent); }
+
+    /* ── Payload Options ── */
+    .payload-options-section { display: none; }
+    .payload-options-section.visible { display: block; }
+
+    /* ── Toggle switch ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .toggle-label { font-size: .78rem; color: var(--muted2); }
+    .toggle {
+      position: relative;
+      width: 36px; height: 18px;
+      flex-shrink: 0;
+    }
+    .toggle input { display: none; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: var(--s3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background .2s, border-color .2s;
+    }
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 12px; height: 12px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: left .2s, background .2s;
+    }
+    .toggle input:checked + .toggle-track { background: #3a1a0e; border-color: var(--accent); }
+    .toggle input:checked + .toggle-track::after { left: 20px; background: var(--accent); }
+
+    /* ── Results panel ── */
+    .results-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .results-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .results-toolbar-label {
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      margin-right: 4px;
+    }
+    .search-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: .78rem;
+      padding: 4px 10px;
+      outline: none;
+      width: 180px;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--muted); }
+
+    /* Results table */
+    .results-table-wrap {
+      overflow-y: auto;
+      flex-shrink: 0;
+      max-height: 220px;
+      border-bottom: 1px solid var(--border);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: .77rem; }
+    th {
+      text-align: left;
+      padding: 7px 12px;
+      background: var(--s2);
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      white-space: nowrap;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      position: sticky; top: 0; z-index: 2;
+      cursor: pointer;
+      user-select: none;
+    }
+    th:hover { color: var(--text); }
+    th .sort-arrow { margin-left: 4px; opacity: .4; }
+    th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+    td {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border2);
+      white-space: nowrap;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    tr:hover td { background: var(--s2); }
+    tr.selected td { background: #1a1430 !important; outline: 1px solid var(--purple); outline-offset: -1px; }
+    .status-2xx { color: var(--green); }
+    .status-3xx { color: var(--blue); }
+    .status-4xx { color: var(--yellow); }
+    .status-5xx { color: var(--red); }
+    .status-err { color: var(--muted); }
+
+    /* ── Request/Response viewer ── */
+    .viewer-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .viewer-tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 14px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      align-items: center;
+    }
+    .viewer-tab {
+      padding: 7px 14px;
+      font-size: .78rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .viewer-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .viewer-tab:hover { color: var(--text); }
+    .viewer-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+    .viewer-content {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+      min-height: 0;
+    }
+    .viewer-pane {
+      display: none;
+      height: 100%;
+      overflow: auto;
+    }
+    .viewer-pane.active { display: block; }
+    .viewer-pane.render-pane { display: none; }
+    .viewer-pane.render-pane.active { display: flex; flex-direction: column; }
+    .raw-view {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .77rem;
+      line-height: 1.65;
+      padding: 12px 16px;
+      color: #c9d1f0;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .raw-view .hl { background: rgba(240, 180, 41, 0.25); border-radius: 2px; }
+    .response-iframe {
+      width: 100%;
+      flex: 1;
+      border: none;
+      background: #fff;
+    }
+
+    /* ── Fullscreen modal ── */
+    #fullscreen-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: var(--bg);
+      flex-direction: column;
+    }
+    #fullscreen-modal.open { display: flex; }
+    .fs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .fs-title { font-size: .82rem; color: var(--accent); font-weight: 600; }
+    .fs-tabs {
+      display: flex;
+      gap: 2px;
+    }
+    .fs-tab {
+      padding: 5px 12px;
+      font-size: .78rem;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .fs-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .fs-content {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    .fs-pane {
+      display: none;
+      height: 100%;
+      overflow: auto;
+    }
+    .fs-pane.active { display: block; }
+    .fs-pane.fs-render.active { display: flex; flex-direction: column; }
+
+    /* ── Attack config (top of right panel) ── */
+    .attack-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 18px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .attack-type-label { font-size: .78rem; color: var(--muted2); font-weight: 500; }
+
+    /* Progress bar */
+    .progress-wrap {
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width .3s;
+      width: 0%;
+    }
+
+    /* Search highlight */
+    .search-match { background: rgba(240, 180, 41, 0.3); border-radius: 2px; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* Divider drag handle */
+    .divider {
+      width: 4px;
+      background: var(--border);
+      cursor: col-resize;
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+    .divider:hover, .divider.dragging { background: var(--accent); }
+
+    /* Status indicator */
+    .run-status {
+      font-size: .75rem;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 3px 10px;
+      border-radius: 4px;
+      background: var(--s3);
+      border: 1px solid var(--border);
+      color: var(--muted2);
+    }
+    .run-status.running { color: var(--green); border-color: var(--green); background: #0d3322; animation: pulse 1.5s infinite; }
+    .run-status.done    { color: var(--blue);  border-color: var(--blue);  background: #0d1e3a; }
+    .run-status.error   { color: var(--red);   border-color: var(--red);   background: #2d1111; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+
+    .sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <div class="header-left">
+    <span class="logo">⚡ TGA</span>
+    <span class="page-title">Intruder</span>
+  </div>
+  <div class="header-right">
+    <span class="run-status" id="runStatus">Idle</span>
+    <a href="/dashboard" style="text-decoration:none">
+      <button class="btn btn-sm">← Dashboard</button>
+    </a>
+  </div>
+</header>
+
+<!-- ── Tabs ── -->
+<div class="tabs">
+  <div class="tab active" data-tab="positions">Positions</div>
+  <div class="tab" data-tab="payloads">Payloads</div>
+  <div class="tab" data-tab="settings">Settings</div>
+  <div class="tab" data-tab="results">Results</div>
+</div>
+
+<!-- ══════════════════════════════════════════════ POSITIONS TAB -->
+<div class="main-layout" id="tab-positions">
+
+  <!-- LEFT: request editor -->
+  <div class="left-panel" id="leftPanel">
+
+    <!-- Target bar -->
+    <div class="target-bar">
+      <span class="target-label">Target URL</span>
+      <input id="targetUrl" class="target-input" type="text" placeholder="https://example.com/path?param=value" />
+      <button class="btn btn-sm" onclick="parseHostFromUrl()">Apply</button>
+    </div>
+
+    <!-- Editor toolbar -->
+    <div class="editor-toolbar">
+      <span class="editor-toolbar-label">Request</span>
+      <div class="sep"></div>
+      <button class="btn btn-sm btn-accent" onmousedown="event.preventDefault();addMarker()">§ Add Marker</button>
+      <button class="btn btn-sm" onclick="clearMarkers()">✕ Clear Markers</button>
+      <button class="btn btn-sm" onclick="autoDetect()">⚙ Auto Detect</button>
+      <div class="sep"></div>
+      <select id="methodSelect" style="min-width:80px; padding:3px 8px;">
+        <option>GET</option><option>POST</option><option>PUT</option>
+        <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+      </select>
+    </div>
+
+    <!-- Request editor with overlay -->
+    <div class="request-wrap">
+      <div id="requestOverlay" aria-hidden="true"></div>
+      <textarea id="requestEditor" spellcheck="false"
+        placeholder="Paste your raw HTTP request here...
+Example:
+GET /search?q=test HTTP/1.1
+Host: example.com
+User-Agent: Mozilla/5.0
+Accept: */*
+Connection: close"
+      ></textarea>
+    </div>
+
+    <!-- Marker legend -->
+    <div style="padding:7px 14px; background:var(--s2); border-top:1px solid var(--border); display:flex; gap:14px; align-items:center; flex-shrink:0;">
+      <span style="font-size:.72rem; color:var(--muted);">Markers: <span id="markerCountBadge" style="color:var(--accent); font-weight:600; font-family:'JetBrains Mono',monospace;">0</span></span>
+      <span style="font-size:.72rem; color:var(--muted);">Select text then click <kbd style="background:var(--s3); border:1px solid var(--border); border-radius:3px; padding:1px 5px; font-size:.7rem;">§ Add Marker</kbd></span>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="divider" id="divider"></div>
+
+  <!-- RIGHT: attack config -->
+  <div class="right-panel">
+
+    <!-- Attack bar -->
+    <div class="attack-bar">
+      <span class="attack-type-label">Attack type:</span>
+      <select id="attackType" onchange="onAttackTypeChange()">
+        <option value="sniper">Sniper</option>
+        <option value="battering_ram">Battering Ram</option>
+        <option value="pitchfork">Pitchfork</option>
+        <option value="cluster_bomb">Cluster Bomb</option>
+      </select>
+      <div class="sep"></div>
+      <span class="attack-type-label">Threads:</span>
+      <input type="number" id="threadCount" value="10" min="1" max="500" style="width:60px;" class="form-input">
+      <div class="sep"></div>
+      <button class="btn btn-green btn-lg" id="startBtn" onclick="startAttack()">▶ Start Attack</button>
+      <button class="btn btn-red btn-sm" id="stopBtn" onclick="stopAttack()" style="display:none">■ Stop</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+
+    <!-- Payload Sets section -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon">?</div>
+        <span class="section-title">Payload Sets</span>
+      </div>
+      <p class="section-desc">You can define one or more payload sets. The number of payload sets depends on the attack type and the number of markers defined.</p>
+      <div class="form-row">
+        <span class="form-label">Payload set:</span>
+        <select id="payloadSetSelect" onchange="switchPayloadSet(this.value)"></select>
+        <span class="form-stat">Payload count: <span id="payloadCount">0</span></span>
+      </div>
+      <div class="form-row">
+        <span class="form-label">Payload type:</span>
+        <select id="payloadType" onchange="onPayloadTypeChange()">
+          <option value="simple_list">Simple list</option>
+          <option value="numbers">Numbers</option>
+          <option value="runtime_file">Runtime file</option>
+          <option value="brute_force">Brute force</option>
+          <option value="dates">Dates</option>
+        </select>
+        <span class="form-stat">Request count: <span id="requestCount">0</span></span>
+      </div>
+    </div>
+
+    <!-- Payload Options: Simple list -->
+    <div class="section" id="opts-simple_list">
+      <div class="section-header">
+        <div class="section-icon">?</div>
+        <span class="section-title">Payload Options [Simple list]</span>
+      </div>
+      <p class="section-desc">This payload type lets you configure a simple list of strings that are used as payloads.</p>
+      <div class="payload-area">
+        <div class="payload-list-wrap">
+          <textarea id="payloadList" placeholder="One payload per line..."></textarea>
+        </div>
+        <div class="payload-btn-col">
+          <button class="btn btn-sm" onclick="pastePayloads()">Paste</button>
+          <button class="btn btn-sm" onclick="loadPayloadFile()">Load…</button>
+          <button class="btn btn-sm" onclick="removeSelectedPayload()">Remove</button>
+          <button class="btn btn-sm" onclick="clearPayloads()">Clear</button>
+          <button class="btn btn-sm" onclick="deduplicatePayloads()">Deduplicate</button>
+        </div>
+      </div>
+      <div class="payload-add-row">
+        <button class="btn btn-sm" onclick="addSinglePayload()">Add</button>
+        <input id="newPayloadInput" type="text" placeholder="Enter a new item" onkeydown="if(event.key==='Enter')addSinglePayload()">
+      </div>
+      <select class="add-from-list" id="addFromList" onchange="addFromBuiltinList(this.value)">
+        <option value="">Add from list…</option>
+        <optgroup label="Fuzzing">
+          <option value="sqli">SQL Injection</option>
+          <option value="xss">XSS</option>
+          <option value="ssti">SSTI</option>
+          <option value="lfi">LFI / Path Traversal</option>
+          <option value="cmdi">Command Injection</option>
+          <option value="xxe">XXE</option>
+          <option value="open_redirect">Open Redirect</option>
+        </optgroup>
+        <optgroup label="Auth">
+          <option value="common_pass">Common Passwords (top 50)</option>
+          <option value="common_user">Common Usernames</option>
+        </optgroup>
+        <optgroup label="Discovery">
+          <option value="dirs">Common Directories</option>
+          <option value="exts">File Extensions</option>
+          <option value="params">Common Parameters</option>
+        </optgroup>
+      </select>
+      <input type="file" id="payloadFileInput" style="display:none" onchange="onPayloadFileLoad(event)">
+    </div>
+
+    <!-- Payload Options: Numbers -->
+    <div class="section" id="opts-numbers" style="display:none">
+      <div class="section-header">
+        <div class="section-icon">?</div>
+        <span class="section-title">Payload Options [Numbers]</span>
+      </div>
+      <p class="section-desc">Generates a sequential or random numeric payload range.</p>
+      <div class="numbers-row" style="gap:14px; flex-wrap:wrap;">
+        <div class="form-row" style="margin:0"><span class="form-label">From:</span><input class="num-input" id="numFrom" type="number" value="1"></div>
+        <div class="form-row" style="margin:0"><span class="form-label">To:</span><input class="num-input" id="numTo" type="number" value="100"></div>
+        <div class="form-row" style="margin:0"><span class="form-label">Step:</span><input class="num-input" id="numStep" type="number" value="1"></div>
+        <div class="form-row" style="margin:0">
+          <span class="form-label">Format:</span>
+          <select id="numFormat" style="min-width:100px">
+            <option value="decimal">Decimal</option>
+            <option value="hex">Hex</option>
+            <option value="octal">Octal</option>
+            <option value="binary">Binary</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payload Options: Brute Force -->
+    <div class="section" id="opts-brute_force" style="display:none">
+      <div class="section-header">
+        <div class="section-icon">?</div>
+        <span class="section-title">Payload Options [Brute force]</span>
+      </div>
+      <p class="section-desc">Generates all permutations of a character set up to a max length.</p>
+      <div class="form-row"><span class="form-label">Character set:</span><input class="form-input" id="bfCharset" value="abcdefghijklmnopqrstuvwxyz0123456789" style="flex:1; min-width:0;"></div>
+      <div class="form-row">
+        <span class="form-label">Min length:</span><input class="num-input" id="bfMin" type="number" value="1">
+        <span class="form-label" style="margin-left:10px">Max length:</span><input class="num-input" id="bfMax" type="number" value="4">
+      </div>
+    </div>
+
+    <!-- Payload Options: Dates -->
+    <div class="section" id="opts-dates" style="display:none">
+      <div class="section-header">
+        <div class="section-icon">?</div>
+        <span class="section-title">Payload Options [Dates]</span>
+      </div>
+      <p class="section-desc">Generates a date range.</p>
+      <div class="form-row"><span class="form-label">From:</span><input class="form-input" id="dateFrom" type="date" value="2024-01-01"></div>
+      <div class="form-row"><span class="form-label">To:</span><input class="form-input" id="dateTo" type="date" value="2024-12-31"></div>
+      <div class="form-row"><span class="form-label">Format:</span>
+        <select id="dateFormat">
+          <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+          <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+          <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+          <option value="DD-MM-YYYY">DD-MM-YYYY</option>
+          <option value="YYYYMMdd">YYYYMMdd</option>
+          <option value="unix">Unix timestamp</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Payload Options: Runtime file -->
+    <div class="section" id="opts-runtime_file" style="display:none">
+      <div class="section-header">
+        <div class="section-icon">?</div>
+        <span class="section-title">Payload Options [Runtime file]</span>
+      </div>
+      <p class="section-desc">Load payloads from a file at attack start time.</p>
+      <div class="form-row">
+        <span class="form-label">File path:</span>
+        <input class="form-input" id="runtimeFilePath" placeholder="/path/to/wordlist.txt" style="flex:1">
+        <button class="btn btn-sm" onclick="document.getElementById('runtimeFilePicker').click()">Browse</button>
+        <input type="file" id="runtimeFilePicker" style="display:none" onchange="e=>document.getElementById('runtimeFilePath').value=e.target.files[0]?.name||''">
+      </div>
+    </div>
+
+    <!-- Payload Processing -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon">?</div>
+        <span class="section-title">Payload Processing</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="toggleUrlEncode" checked><span class="toggle-track"></span></label>
+        <span class="toggle-label">URL-encode payloads (encodeURIComponent)</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="toggleSkipNull"><span class="toggle-track"></span></label>
+        <span class="toggle-label">Skip empty / null payloads</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="toggleFollowRedir" checked><span class="toggle-track"></span></label>
+        <span class="toggle-label">Follow redirects</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="toggleStoreResp" checked><span class="toggle-track"></span></label>
+        <span class="toggle-label">Store full responses</span>
+      </div>
+    </div>
+
+  </div><!-- /right-panel -->
+</div><!-- /tab-positions -->
+
+<!-- ══════════════════════════════════════════════ RESULTS TAB (hidden initially) -->
+<div style="display:none; flex:1; flex-direction:column; overflow:hidden; height:calc(100vh - 96px);" id="tab-results">
+
+  <!-- Results toolbar -->
+  <div class="results-toolbar">
+    <span class="results-toolbar-label">Results</span>
+    <div class="sep"></div>
+    <div style="position:relative; display:flex; align-items:center; gap:4px;">
+      <input class="search-input" id="globalSearch" placeholder="🔍 Search requests…" style="width:220px"
+        onkeydown="if(event.key==='Enter') runGlobalSearch()">
+      <button class="btn btn-sm btn-accent" onclick="runGlobalSearch()">Search</button>
+      <button class="btn btn-sm" onclick="clearGlobalSearch()" title="Clear search">✕</button>
+      <!-- Search results dropdown -->
+      <div id="searchDropdown" style="display:none; position:absolute; top:100%; left:0; width:680px;
+        background:var(--s1); border:1px solid var(--border); border-radius:6px; z-index:200;
+        max-height:320px; overflow-y:auto; margin-top:4px; box-shadow:0 8px 24px rgba(0,0,0,.5);">
+        <div id="searchDropdownContent"></div>
+      </div>
+    </div>
+    <button class="btn btn-sm" onclick="clearResults()">Clear</button>
+    <button class="btn btn-sm" onclick="exportCsv()">Export CSV</button>
+    <div style="margin-left:auto; font-size:.75rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">
+      <span id="resultStats">0 requests</span>
+    </div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap"><div class="progress-bar" id="progressBar2"></div></div>
+
+  <!-- Table -->
+  <div class="results-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortResults('id')">#<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('payload')">Payload<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('status')">Status<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('length')">Length<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('time')">Time (ms)<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('marker')">Marker<span class="sort-arrow">↕</span></th>
+          <th>Comment</th>
+        </tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Viewer -->
+  <div class="viewer-wrap">
+    <div class="viewer-tabs">
+      <div class="viewer-tab active" data-vtab="raw-req">Request</div>
+      <div class="viewer-tab" data-vtab="raw-resp">Response (Raw)</div>
+      <div class="viewer-tab" data-vtab="render-resp">Response (Rendered)</div>
+      <div class="viewer-actions">
+        <input class="search-input" id="localSearch" placeholder="🔍 Search here…" oninput="localSearchFn()" style="width:160px">
+        <button class="btn btn-sm" onclick="navigateMatch('local',-1)">▲</button>
+        <button class="btn btn-sm" onclick="navigateMatch('local',1)">▼</button>
+        <button class="btn btn-sm" onclick="openFullscreen()">⛶ Fullscreen</button>
+      </div>
+    </div>
+    <div class="viewer-content">
+      <div class="viewer-pane active" id="vp-raw-req">
+        <div class="raw-view" id="rawReqContent">Select a result row to view the request.</div>
+      </div>
+      <div class="viewer-pane" id="vp-raw-resp">
+        <div class="raw-view" id="rawRespContent">Select a result row to view the response.</div>
+      </div>
+      <div class="viewer-pane render-pane" id="vp-render-resp">
+        <iframe id="responseFrame" class="response-iframe" sandbox="allow-scripts" src="about:blank"></iframe>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tab-results -->
+
+<!-- ══════════════════════════════════════════════ SETTINGS TAB -->
+<div style="display:none; overflow-y:auto; height:calc(100vh - 96px);" id="tab-settings">
+  <div class="section" style="max-width:560px">
+    <div class="section-header"><span class="section-title">Request Settings</span></div>
+    <div class="form-row"><span class="form-label">Timeout (s):</span><input class="num-input" id="timeout" type="number" value="10"></div>
+    <div class="form-row"><span class="form-label">Delay (ms):</span><input class="num-input" id="reqDelay" type="number" value="0"></div>
+    <div class="form-row">
+      <span class="form-label">Concurrency:</span>
+      <input class="num-input" id="threadCount2" type="number" value="10" oninput="document.getElementById('threadCount').value=this.value">
+    </div>
+  </div>
+  <div class="section" style="max-width:560px">
+    <div class="section-header"><span class="section-title">Response Matching</span></div>
+    <div class="form-row">
+      <span class="form-label">Match string:</span>
+      <input class="form-input" id="matchString" placeholder="e.g. 'success' or regex" style="flex:1">
+    </div>
+    <div class="toggle-row" style="margin-top:4px">
+      <label class="toggle"><input type="checkbox" id="matchIsRegex"><span class="toggle-track"></span></label>
+      <span class="toggle-label">Use regex for match</span>
+    </div>
+    <div class="toggle-row">
+      <label class="toggle"><input type="checkbox" id="highlightMatch" checked><span class="toggle-track"></span></label>
+      <span class="toggle-label">Highlight matches in response viewer</span>
+    </div>
+  </div>
+  <div class="section" style="max-width:560px">
+    <div class="section-header"><span class="section-title">Proxy</span></div>
+    <div class="form-row">
+      <span class="form-label">Upstream proxy:</span>
+      <input class="form-input" id="proxyHost" placeholder="127.0.0.1:8080" style="flex:1">
+    </div>
+    <div class="toggle-row">
+      <label class="toggle"><input type="checkbox" id="useProxy"><span class="toggle-track"></span></label>
+      <span class="toggle-label">Route through proxy</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ FULLSCREEN MODAL -->
+<div id="fullscreen-modal">
+  <div class="fs-header">
+    <span class="fs-title" id="fs-title">Viewer</span>
+    <div class="fs-tabs">
+      <div class="fs-tab active" onclick="switchFsTab('req')">Request</div>
+      <div class="fs-tab" onclick="switchFsTab('raw')">Response (Raw)</div>
+      <div class="fs-tab" onclick="switchFsTab('render')">Response (Rendered)</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center; margin-left:auto;">
+      <input class="search-input" id="fsSearch" placeholder="🔍 Search…" oninput="fsSearchFn()">
+      <button class="btn btn-sm" onclick="navigateMatch('fs',-1)">▲</button>
+      <button class="btn btn-sm" onclick="navigateMatch('fs',1)">▼</button>
+      <button class="btn btn-sm" onclick="closeFullscreen()">✕ Close</button>
+    </div>
+  </div>
+  <div class="fs-content">
+    <div class="fs-pane active" id="fs-pane-req"><div class="raw-view" id="fsReqContent"></div></div>
+    <div class="fs-pane" id="fs-pane-raw"><div class="raw-view" id="fsRawContent"></div></div>
+    <div class="fs-pane fs-render" id="fs-pane-render">
+      <iframe id="fsFrame" class="response-iframe" sandbox="allow-scripts" src="about:blank"></iframe>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════ STATE
+const state = {
+  markers: [],       // [{start, end, label}]
+  payloadSets: {},   // { setIdx: [payloads] }
+  currentSet: 1,
+  results: [],
+  selectedRow: null,
+  running: false,
+  stopFlag: false,
+  sortCol: 'id',
+  sortDir: 1,
+  attackType: 'sniper',
+};
+
+// ════════════════════════════════════════ TABS
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const name = t.dataset.tab;
+    document.getElementById('tab-positions').style.display = name === 'positions' ? 'flex' : 'none';
+    document.getElementById('tab-results').style.display   = name === 'results'   ? 'flex' : 'none';
+    document.getElementById('tab-settings').style.display  = name === 'settings'  ? 'block' : 'none';
+    // payloads tab lives inside right-panel of positions, just switch there
+    if (name === 'payloads') {
+      document.getElementById('tab-positions').style.display = 'flex';
+      document.querySelectorAll('.tab')[0].classList.remove('active');
+    }
+  });
+});
+
+// ════════════════════════════════════════ VIEWER TABS
+document.querySelectorAll('.viewer-tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.viewer-tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const name = t.dataset.vtab;
+    document.querySelectorAll('.viewer-pane').forEach(p => p.classList.remove('active'));
+    document.getElementById('vp-' + name).classList.add('active');
+  });
+});
+
+// ════════════════════════════════════════ MARKERS
+const editor = document.getElementById('requestEditor');
+const overlay = document.getElementById('requestOverlay');
+
+editor.addEventListener('input', () => { syncMarkersFromText(); updateMarkerCount(); updatePayloadSetSelector(); autoPopulateUrl(); });
+editor.addEventListener('paste', () => setTimeout(() => { syncMarkersFromText(); updateMarkerCount(); updatePayloadSetSelector(); autoPopulateUrl(); }, 0));
+// overlay removed
+
+function addMarker() {
+  const start = editor.selectionStart;
+  const end   = editor.selectionEnd;
+  if (start === end) { alert('Select some text first to mark as a payload position.'); return; }
+  const text = editor.value;
+  const selected = text.slice(start, end);
+  editor.value = text.slice(0, start) + '§' + selected + '§' + text.slice(end);
+  editor.selectionStart = editor.selectionEnd = end + 2;
+  syncMarkersFromText();
+  updateMarkerCount();
+  updatePayloadSetSelector();
+}
+
+function clearMarkers() {
+  editor.value = editor.value.replace(/§/g, '');
+  state.markers = [];
+  updateMarkerCount();
+  updatePayloadSetSelector();
+}
+
+function syncMarkersFromText() {
+  const text = editor.value;
+  const markers = [];
+  let i = 0;
+  while (i < text.length) {
+    const s = text.indexOf('§', i);
+    if (s === -1) break;
+    const e = text.indexOf('§', s + 1);
+    if (e === -1) break;
+    markers.push({ start: s, end: e + 1 });
+    i = e + 1;
+  }
+  state.markers = markers;
+}
+
+function autoDetect() {
+  let clean = editor.value.replace(/§/g, '');
+  const paramRe = /([?&])([^=&\s]+)=([^&\s\r\n]*)/g;
+  let result = '', last = 0, m, found = false;
+  while ((m = paramRe.exec(clean)) !== null) {
+    found = true;
+    const vs = m.index + m[1].length + m[2].length + 1;
+    const ve = vs + m[3].length;
+    result += clean.slice(last, vs) + '§' + m[3] + '§';
+    last = ve;
+  }
+  if (found) { result += clean.slice(last); editor.value = result; }
+  syncMarkersFromText();
+  updateMarkerCount();
+  updatePayloadSetSelector();
+}
+
+function renderOverlay() { /* no-op: markers shown as § in text */ }
+
+function updateMarkerCount() {
+  document.getElementById('markerCountBadge').textContent = state.markers.length;
+}
+
+// ════════════════════════════════════════ TARGET / HOST
+function autoPopulateUrl() {
+  const text = editor.value;
+  if (!text.trim()) return;
+  const lines = text.split(/\r?\n/);
+  const parts = (lines[0] || '').split(' ');
+  const path = parts[1] || '/';
+  let host = '';
+  for (const line of lines.slice(1)) {
+    if (line.toLowerCase().startsWith('host:')) { host = line.slice(5).trim(); break; }
+  }
+  if (!host) return;
+  const scheme = (host.includes(':80') && !host.includes(':443')) || host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
+  const url = `${scheme}://${host}${path}`;
+  const field = document.getElementById('targetUrl');
+  field.value = url;
+}
+
+document.getElementById('targetUrl').addEventListener('input', function() {
+  try {
+    const u = new URL(this.value);
+    const host = u.host;
+    // Replace Host header in editor
+    const val = editor.value;
+    const updated = val.replace(/^Host:.*$/mi, `Host: ${host}`);
+    if (updated !== val) editor.value = updated;
+  } catch(_) {}
+});
+
+function parseHostFromUrl() {
+  const val = document.getElementById('targetUrl').value.trim();
+  try {
+    const u = new URL(val);
+    const host = u.host;
+    const txt = editor.value;
+    const updated = txt.replace(/^Host:.*$/mi, `Host: ${host}`);
+    editor.value = updated !== txt ? updated : txt;
+    renderOverlay();
+  } catch(_) { alert('Invalid URL'); }
+}
+
+// ════════════════════════════════════════ ATTACK TYPE
+function onAttackTypeChange() {
+  state.attackType = document.getElementById('attackType').value;
+  updatePayloadSetSelector();
+}
+
+function updatePayloadSetSelector() {
+  const n = state.markers.length || 1;
+  const attackType = state.attackType;
+  let sets;
+  if (attackType === 'sniper' || attackType === 'battering_ram') sets = 1;
+  else sets = Math.max(1, n); // pitchfork / cluster_bomb = one per marker
+
+  const sel = document.getElementById('payloadSetSelect');
+  sel.innerHTML = '';
+  for (let i = 1; i <= sets; i++) {
+    const opt = document.createElement('option');
+    opt.value = i; opt.textContent = i;
+    sel.appendChild(opt);
+    if (!state.payloadSets[i]) state.payloadSets[i] = [];
+  }
+  switchPayloadSet(1);
+}
+
+function switchPayloadSet(idx) {
+  idx = parseInt(idx);
+  state.currentSet = idx;
+  const list = state.payloadSets[idx] || [];
+  document.getElementById('payloadList').value = list.join('\n');
+  updateCounts();
+}
+
+// ════════════════════════════════════════ PAYLOAD TYPE
+function onPayloadTypeChange() {
+  const t = document.getElementById('payloadType').value;
+  ['simple_list','numbers','brute_force','dates','runtime_file'].forEach(id => {
+    document.getElementById('opts-' + id).style.display = id === t ? '' : 'none';
+  });
+}
+
+// ════════════════════════════════════════ PAYLOAD LIST OPS
+document.getElementById('payloadList').addEventListener('input', () => {
+  const list = document.getElementById('payloadList').value.split('\n').filter(x=>x.trim());
+  state.payloadSets[state.currentSet] = list;
+  updateCounts();
+});
+
+function pastePayloads() {
+  navigator.clipboard.readText().then(text => {
+    document.getElementById('payloadList').value += (document.getElementById('payloadList').value ? '\n' : '') + text.trim();
+    syncPayloadList();
+  }).catch(() => alert('Clipboard read failed. Paste manually.'));
+}
+
+function loadPayloadFile() { document.getElementById('payloadFileInput').click(); }
+function onPayloadFileLoad(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('payloadList').value = ev.target.result.trim();
+    syncPayloadList();
+  };
+  reader.readAsText(file);
+}
+
+function removeSelectedPayload() {
+  const ta = document.getElementById('payloadList');
+  const lines = ta.value.split('\n');
+  const start = ta.value.substring(0, ta.selectionStart).split('\n').length - 1;
+  lines.splice(start, 1);
+  ta.value = lines.join('\n');
+  syncPayloadList();
+}
+
+function clearPayloads() {
+  document.getElementById('payloadList').value = '';
+  syncPayloadList();
+}
+
+function deduplicatePayloads() {
+  const ta = document.getElementById('payloadList');
+  const lines = [...new Set(ta.value.split('\n').map(x=>x.trim()).filter(Boolean))];
+  ta.value = lines.join('\n');
+  syncPayloadList();
+}
+
+function addSinglePayload() {
+  const inp = document.getElementById('newPayloadInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  const ta = document.getElementById('payloadList');
+  ta.value += (ta.value ? '\n' : '') + val;
+  inp.value = '';
+  syncPayloadList();
+}
+
+function syncPayloadList() {
+  const list = document.getElementById('payloadList').value.split('\n').filter(x=>x.trim());
+  state.payloadSets[state.currentSet] = list;
+  updateCounts();
+}
+
+function updateCounts() {
+  const list = getPayloadList(state.currentSet);
+  document.getElementById('payloadCount').textContent = list.length;
+  // request count depends on attack type
+  const markers = state.markers.length || 1;
+  let rc = 0;
+  if (state.attackType === 'sniper') rc = list.length * markers;
+  else if (state.attackType === 'battering_ram') rc = list.length;
+  else if (state.attackType === 'pitchfork') rc = list.length;
+  else if (state.attackType === 'cluster_bomb') {
+    rc = 1;
+    for (let i = 1; i <= markers; i++) rc *= (state.payloadSets[i]?.length || list.length);
+  }
+  document.getElementById('requestCount').textContent = rc;
+}
+
+// Builtin lists
+const builtinLists = {
+  sqli: ["'","\"","' OR '1'='1","' OR 1=1--","\" OR \"1\"=\"1","1; DROP TABLE users--","1 UNION SELECT NULL--","' UNION SELECT NULL,NULL--","admin'--","' OR SLEEP(5)--","1 AND 1=2 UNION SELECT user(),database()--"],
+  xss: ['<script>alert(1)<\/script>','"><script>alert(1)<\/script>','<img src=x onerror=alert(1)>','<svg onload=alert(1)>','javascript:alert(1)','"><img src=x onerror=alert(1)>','<body onload=alert(1)>','<iframe src="javascript:alert(1)">'],
+  ssti: ['{{7*7}}','${7*7}','<%= 7*7 %>','#{7*7}','{{config}}','{{self.__class__.__mro__[1].__subclasses__()}}','${{7*7}}','*{7*7}'],
+  lfi: ['../etc/passwd','../../etc/passwd','../../../etc/passwd','../../../../etc/passwd','../../../../../etc/passwd','..%2Fetc%2Fpasswd','..%252Fetc%252Fpasswd','/etc/passwd','/etc/shadow','/proc/self/environ','....//....//etc/passwd'],
+  cmdi: [';ls',';id','|id','&&id','`id`','$(id)',';cat /etc/passwd','|cat /etc/passwd','&&whoami','|| whoami','; sleep 5'],
+  xxe: ['<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><foo>&xxe;</foo>'],
+  open_redirect: ['//evil.com','https://evil.com','//evil.com/%2F..','https://google.com','javascript:alert(1)','//attacker.com@legit.com'],
+  common_pass: ['123456','password','123456789','12345678','12345','1234567','password1','1234567890','abc123','111111','admin','letmein','welcome','monkey','dragon','master','666666','qwerty','sunshine','princess','iloveyou','123123','admin123','pass','root','toor','test','guest','secret'],
+  common_user: ['admin','administrator','root','user','guest','test','demo','operator','manager','support','service','system','oracle','postgres','mysql','sa','ftp','www'],
+  dirs: ['admin','login','dashboard','wp-admin','phpmyadmin','api','v1','v2','backup','uploads','files','images','static','assets','config','test','dev','staging','old','bak','.git','.env','robots.txt','sitemap.xml','swagger','docs','graphql'],
+  exts: ['.php','.asp','.aspx','.jsp','.bak','.backup','.old','.swp','.zip','.tar.gz','.sql','.log','.conf','.config','.env','.git','.DS_Store'],
+  params: ['id','user','username','email','password','token','key','search','q','query','file','path','url','redirect','next','callback','page','limit','offset','sort','order','filter','debug','test'],
+};
+
+function addFromBuiltinList(key) {
+  if (!key) return;
+  const list = builtinLists[key];
+  if (!list) return;
+  const ta = document.getElementById('payloadList');
+  ta.value += (ta.value ? '\n' : '') + list.join('\n');
+  syncPayloadList();
+  document.getElementById('addFromList').value = '';
+}
+
+// ════════════════════════════════════════ ATTACK ENGINE
+async function startAttack() {
+  if (state.running) return;
+  const rawRequest = editor.value.trim();
+  if (!rawRequest) { alert('Paste a request first.'); return; }
+  if (!state.markers.length) { alert('Add at least one payload marker.'); return; }
+
+  // Switch to results tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab')[3].classList.add('active');
+  document.getElementById('tab-positions').style.display = 'none';
+  document.getElementById('tab-results').style.display = 'flex';
+  document.getElementById('tab-settings').style.display = 'none';
+
+  state.results = [];
+  state.running = true;
+  state.stopFlag = false;
+  renderResultsTable();
+  setStatus('running', 'Running…');
+  document.getElementById('startBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = '';
+
+  const payloads = buildPayloadCombinations();
+  const threads  = parseInt(document.getElementById('threadCount').value) || 10;
+  const delay    = parseInt(document.getElementById('reqDelay')?.value) || 0;
+  const urlEncode = document.getElementById('toggleUrlEncode').checked;
+  const targetUrl = document.getElementById('targetUrl').value.trim();
+
+  let done = 0;
+  const total = payloads.length;
+
+  // Semaphore
+  let active = 0;
+  const sem = () => new Promise(res => {
+    const check = () => { if (active < threads) { active++; res(); } else setTimeout(check, 50); };
+    check();
+  });
+
+  const promises = payloads.map((combo, idx) => (async () => {
+    if (state.stopFlag) return;
+    await sem();
+    if (state.stopFlag) { active--; return; }
+    if (delay > 0) await sleep(delay);
+    const result = await sendRequest(rawRequest, combo, idx + 1, urlEncode, targetUrl);
+    state.results.push(result);
+    active--;
+    done++;
+    const pct = Math.round((done / total) * 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressBar2').style.width = pct + '%';
+    document.getElementById('resultStats').textContent = `${done} / ${total} requests`;
+    renderResultsTable();
+  })());
+
+  await Promise.all(promises);
+
+  state.running = false;
+  document.getElementById('startBtn').style.display = '';
+  document.getElementById('stopBtn').style.display = 'none';
+  setStatus('done', `Done — ${total} requests`);
+  renderResultsTable();
+}
+
+function stopAttack() {
+  state.stopFlag = true;
+  state.running = false;
+  setStatus('', 'Stopped');
+  document.getElementById('startBtn').style.display = '';
+  document.getElementById('stopBtn').style.display = 'none';
+}
+
+function getPayloadList(setIdx) {
+  const type = document.getElementById('payloadType').value;
+  if (type === 'numbers') {
+    const from  = parseFloat(document.getElementById('numFrom').value) || 0;
+    const to    = parseFloat(document.getElementById('numTo').value) || 100;
+    const step  = parseFloat(document.getElementById('numStep').value) || 1;
+    const fmt   = document.getElementById('numFormat').value;
+    const list  = [];
+    for (let n = from; n <= to; n = Math.round((n + step) * 1e10) / 1e10) {
+      if (fmt === 'hex')    list.push(Math.floor(n).toString(16));
+      else if (fmt === 'octal')  list.push(Math.floor(n).toString(8));
+      else if (fmt === 'binary') list.push(Math.floor(n).toString(2));
+      else list.push(String(n));
+    }
+    return list;
+  }
+  if (type === 'brute_force') {
+    const charset = document.getElementById('bfCharset').value || 'abc';
+    const minLen  = parseInt(document.getElementById('bfMin').value) || 1;
+    const maxLen  = parseInt(document.getElementById('bfMax').value) || 3;
+    const list = [];
+    function gen(cur) {
+      if (cur.length >= minLen) list.push(cur);
+      if (cur.length >= maxLen) return;
+      for (const ch of charset) gen(cur + ch);
+    }
+    gen('');
+    return list;
+  }
+  if (type === 'dates') {
+    const from  = new Date(document.getElementById('dateFrom').value);
+    const to    = new Date(document.getElementById('dateTo').value);
+    const fmt   = document.getElementById('dateFormat').value;
+    const list  = [];
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+      const yy = d.getFullYear(), mm = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0');
+      if (fmt === 'YYYY-MM-DD')  list.push(`${yy}-${mm}-${dd}`);
+      else if (fmt === 'DD/MM/YYYY') list.push(`${dd}/${mm}/${yy}`);
+      else if (fmt === 'MM/DD/YYYY') list.push(`${mm}/${dd}/${yy}`);
+      else if (fmt === 'DD-MM-YYYY') list.push(`${dd}-${mm}-${yy}`);
+      else if (fmt === 'YYYYMMdd')   list.push(`${yy}${mm}${dd}`);
+      else if (fmt === 'unix')       list.push(String(Math.floor(d.getTime()/1000)));
+      else list.push(`${yy}-${mm}-${dd}`);
+    }
+    return list;
+  }
+  return state.payloadSets[setIdx] || [];
+}
+
+function buildPayloadCombinations() {
+  const markers = state.markers;
+  if (!markers.length) return [];
+  const type = state.attackType;
+
+  if (type === 'sniper') {
+    const list = getPayloadList(1);
+    const combos = [];
+    for (let mi = 0; mi < markers.length; mi++) {
+      for (const p of list) {
+        combos.push({ markerIdx: mi, payloads: [p], markerLabel: mi + 1 });
+      }
+    }
+    return combos;
+  }
+  if (type === 'battering_ram') {
+    const list = getPayloadList(1);
+    return list.map(p => ({ markerIdx: -1, payloads: Array(markers.length).fill(p), markerLabel: 'all' }));
+  }
+  if (type === 'pitchfork') {
+    const list = getPayloadList(1);
+    return list.map((_, i) => {
+      const row = markers.map((__, mi) => (getPayloadList(mi + 1))[i] || '');
+      return { markerIdx: -1, payloads: row, markerLabel: 'multi' };
+    });
+  }
+  if (type === 'cluster_bomb') {
+    const lists = markers.map((_, mi) => getPayloadList(mi + 1));
+    let combos = [[]];
+    for (const list of lists) {
+      const next = [];
+      for (const c of combos) for (const p of list) next.push([...c, p]);
+      combos = next;
+    }
+    return combos.map(payloads => ({ markerIdx: -1, payloads, markerLabel: 'cluster' }));
+  }
+  return [];
+}
+
+async function sendRequest(rawReq, combo, reqNum, urlEncode, targetUrl) {
+  const text = editor.value;
+  const markers = state.markers;
+  const { payloads, markerIdx, markerLabel } = combo;
+
+  // Apply payloads into request text
+  let builtReq = text;
+  const toApply = markerIdx >= 0
+    ? [{ marker: markers[markerIdx], payload: payloads[0] }]
+    : markers.map((m, i) => ({ marker: m, payload: payloads[i] || '' }));
+  const sorted = [...toApply].sort((a, b) => b.marker.start - a.marker.start);
+  for (const { marker, payload } of sorted) {
+    const p = urlEncode ? encodeURIComponent(payload) : payload;
+    builtReq = builtReq.slice(0, marker.start) + p + builtReq.slice(marker.end);
+  }
+  builtReq = builtReq.replace(/§/g, '');
+
+  // Parse request
+  const lines = builtReq.split(/\r?\n/);
+  const firstLine = lines[0] || '';
+  const [method, path] = firstLine.split(' ');
+  let host = '';
+  const headers = {};
+  let bodyStart = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === '') { bodyStart = i + 1; break; }
+    const colon = lines[i].indexOf(':');
+    if (colon > 0) {
+      const key = lines[i].slice(0, colon).trim().toLowerCase();
+      const val = lines[i].slice(colon + 1).trim();
+      headers[key] = val;
+      if (key === 'host') host = val;
+    }
+  }
+  const reqBody = bodyStart >= 0 ? lines.slice(bodyStart).join('\n') : '';
+
+  // Determine URL
+  let url = targetUrl;
+  if (!url && host && path) {
+    const scheme = (host.includes(':80') && !host.includes(':443')) || host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
+    url = `${scheme}://${host}${path}`;
+  } else if (url && path && path !== '/') {
+    try { const u = new URL(url); url = u.origin + path; } catch(_) {}
+  }
+
+  const t0 = Date.now();
+  let status = 0, length = 0, respRaw = '', respBody = '', contentType = '';
+
+  try {
+    // Send through Flask proxy to get full response bodies
+    const proxyResp = await fetch('/intruder-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        method: method || 'GET',
+        headers,
+        body: reqBody,
+        follow_redirects: document.getElementById('toggleFollowRedir').checked,
+      })
+    });
+    const data = await proxyResp.json();
+    status = data.status;
+    respBody = data.body;
+    length = respBody.length;
+    respRaw = data.raw;
+    contentType = data.content_type || '';
+  } catch(e) {
+    status = 0;
+    respRaw = `[Error: ${e.message}]`;
+    respBody = respRaw;
+    length = 0;
+  }
+
+  const time = Date.now() - t0;
+  const payload = payloads[0] || payloads.join(' | ');
+
+  // Match check
+  let matched = false;
+  const matchStr = document.getElementById('matchString').value;
+  if (matchStr) {
+    try {
+      const re = document.getElementById('matchIsRegex').checked ? new RegExp(matchStr) : null;
+      matched = re ? re.test(respBody) : respBody.includes(matchStr);
+    } catch(_) {}
+  }
+
+  return {
+    id: reqNum,
+    payload,
+    status,
+    length,
+    time,
+    markerLabel,
+    matched,
+    rawReq: builtReq,
+    rawResp: respRaw,
+    respBody,
+    contentType,
+  };
+}
+
+// ════════════════════════════════════════ RESULTS TABLE
+function renderResultsTable() {
+  const q = document.getElementById('globalSearch').value.toLowerCase();
+  let rows = [...state.results];
+  if (q) rows = rows.filter(r =>
+    String(r.payload).toLowerCase().includes(q) ||
+    String(r.status).includes(q) ||
+    r.rawResp.toLowerCase().includes(q)
+  );
+  rows.sort((a, b) => {
+    const av = a[state.sortCol], bv = b[state.sortCol];
+    return (av < bv ? -1 : av > bv ? 1 : 0) * state.sortDir;
+  });
+
+  const tbody = document.getElementById('resultsBody');
+  tbody.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    if (state.selectedRow?.id === r.id) tr.classList.add('selected');
+    const sc = r.status >= 200 && r.status < 300 ? 'status-2xx'
+             : r.status >= 300 && r.status < 400 ? 'status-3xx'
+             : r.status >= 400 && r.status < 500 ? 'status-4xx'
+             : r.status >= 500 ? 'status-5xx' : 'status-err';
+    tr.innerHTML = `
+      <td>${r.id}</td>
+      <td title="${escHtml(r.payload)}">${escHtml(r.payload.slice(0,40))}${r.payload.length>40?'…':''}</td>
+      <td class="${sc}">${r.status || 'ERR'}</td>
+      <td>${r.length}</td>
+      <td>${r.time}</td>
+      <td>${r.markerLabel}</td>
+      <td>${r.matched ? '<span style="color:var(--green)">✓ match</span>' : ''}</td>
+    `;
+    tr.addEventListener('click', () => selectRow(r, tr));
+    tbody.appendChild(tr);
+  }
+}
+
+function selectRow(r, tr) {
+  document.querySelectorAll('#resultsBody tr').forEach(t => t.classList.remove('selected'));
+  tr.classList.add('selected');
+  state.selectedRow = r;
+  showInViewer(r);
+}
+
+function showInViewer(r) {
+  const q = document.getElementById('localSearch').value;
+  document.getElementById('rawReqContent').innerHTML = highlight(escHtml(r.rawReq), q);
+  document.getElementById('rawRespContent').innerHTML = highlight(escHtml(r.rawResp), q);
+  // Render response
+  const frame = document.getElementById('responseFrame');
+  const ct = (r.contentType || '').toLowerCase();
+  function buildRenderHtml(body, isHtml) {
+    if (isHtml) return body;
+    let display = body;
+    if (ct.includes('json')) {
+      try { display = JSON.stringify(JSON.parse(body), null, 2); } catch(_) {}
+    }
+    return `<html><body style="margin:0;background:#0b0d14;color:#c9d1f0;font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;padding:14px">${display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</body></html>`;
+  }
+  const isHtml = ct.includes('html') || (!ct && r.respBody.trimStart().startsWith('<'));
+  const rendered = buildRenderHtml(r.respBody, isHtml);
+  // Use srcdoc — works with sandbox without needing allow-same-origin
+  frame.srcdoc = rendered;
+  // Fullscreen mirrors
+  document.getElementById('fsReqContent').innerHTML = highlight(escHtml(r.rawReq), document.getElementById('fsSearch').value);
+  document.getElementById('fsRawContent').innerHTML = highlight(escHtml(r.rawResp), document.getElementById('fsSearch').value);
+  document.getElementById('fsFrame').srcdoc = rendered;
+}
+
+function highlight(text, q) {
+  if (!q) return text;
+  const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return text.replace(new RegExp(safe, 'gi'), m => `<span class="search-match">${m}</span>`);
+}
+
+// ════════════════════════════════════════ SEARCH NAVIGATION
+const _matchState = { global: 0, local: 0, fs: 0 };
+function navigateMatch(scope, dir) {
+  const panelMap = { local: ['rawReqContent','rawRespContent'], fs: ['fsReqContent','fsRawContent'], global: [] };
+  const panels = panelMap[scope];
+  const matches = [];
+  panels.forEach(id => {
+    document.getElementById(id).querySelectorAll('.search-match').forEach(m => matches.push(m));
+  });
+  if (!matches.length) return;
+  _matchState[scope] = (_matchState[scope] + dir + matches.length) % matches.length;
+  matches.forEach(m => m.style.outline = '');
+  const cur = matches[_matchState[scope]];
+  cur.style.outline = '2px solid var(--accent)';
+  cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+// ════════════════════════════════════════ GLOBAL SEARCH
+function runGlobalSearch() {
+  const q = document.getElementById('globalSearch').value.trim();
+  const dropdown = document.getElementById('searchDropdown');
+  const content  = document.getElementById('searchDropdownContent');
+  if (!q) { dropdown.style.display = 'none'; return; }
+
+  const ql = q.toLowerCase();
+  const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(safe, 'gi');
+
+  // Search across payload, status, raw request, raw response
+  const hits = [];
+  for (const r of state.results) {
+    const fields = [
+      { label: 'Payload',  text: String(r.payload) },
+      { label: 'Request',  text: r.rawReq  || '' },
+      { label: 'Response', text: r.rawResp || '' },
+    ];
+    const matchedFields = [];
+    for (const f of fields) {
+      if (f.text.toLowerCase().includes(ql)) {
+        // Find lines containing the match
+        const lines = f.text.split(/\r?\n/).filter(l => l.toLowerCase().includes(ql));
+        matchedFields.push({ label: f.label, lines });
+      }
+    }
+    if (matchedFields.length) hits.push({ r, matchedFields });
+  }
+
+  if (!hits.length) {
+    content.innerHTML = `<div style="padding:14px 16px; color:var(--muted); font-size:.8rem;">No results for "${escHtml(q)}"</div>`;
+    dropdown.style.display = '';
+    return;
+  }
+
+  // Render results
+  let html = '';
+  for (const { r, matchedFields } of hits) {
+    const sc = r.status >= 200 && r.status < 300 ? 'var(--green)'
+             : r.status >= 300 && r.status < 400 ? 'var(--blue)'
+             : r.status >= 400 ? 'var(--yellow)' : 'var(--muted)';
+    html += `<div class="gsearch-hit" data-id="${r.id}" style="
+      border-bottom:1px solid var(--border2); padding:10px 14px; cursor:pointer;">
+      <div style="display:flex; gap:12px; align-items:center; margin-bottom:6px;">
+        <span style="color:var(--muted); font-size:.72rem; font-family:'JetBrains Mono',monospace">#${r.id}</span>
+        <span style="color:${sc}; font-size:.75rem; font-weight:600">${r.status || 'ERR'}</span>
+        <span style="color:var(--accent); font-size:.75rem; font-family:'JetBrains Mono',monospace">${escHtml(String(r.payload).slice(0,60))}</span>
+        <span style="color:var(--muted); font-size:.72rem; margin-left:auto">${r.length}B · ${r.time}ms</span>
+      </div>`;
+    for (const { label, lines } of matchedFields) {
+      html += `<div style="margin-bottom:4px">
+        <span style="font-size:.68rem; color:var(--muted2); text-transform:uppercase; letter-spacing:.4px; margin-right:6px">${label}</span>`;
+      for (const line of lines.slice(0, 3)) {
+        const highlighted = escHtml(line).replace(new RegExp(escHtml(safe), 'gi'),
+          m => `<mark style="background:var(--marker-bg);color:var(--accent2);border-radius:2px;padding:0 2px">${m}</mark>`);
+        html += `<div style="font-family:'JetBrains Mono',monospace; font-size:.75rem; color:var(--text);
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:2px 0">${highlighted}</div>`;
+      }
+      if (lines.length > 3) html += `<div style="font-size:.7rem;color:var(--muted)">+${lines.length-3} more lines…</div>`;
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  content.innerHTML = html;
+  dropdown.style.display = '';
+
+  // Click on a hit → select that row in table and show viewer
+  content.querySelectorAll('.gsearch-hit').forEach(el => {
+    el.addEventListener('mouseenter', () => el.style.background = 'var(--s2)');
+    el.addEventListener('mouseleave', () => el.style.background = '');
+    el.addEventListener('click', () => {
+      const id = parseInt(el.dataset.id);
+      const result = state.results.find(r => r.id === id);
+      if (!result) return;
+      // Select row in table
+      const rows = document.querySelectorAll('#resultsBody tr');
+      rows.forEach(tr => {
+        if (parseInt(tr.cells[0]?.textContent) === id) {
+          selectRow(result, tr);
+          tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      });
+      dropdown.style.display = 'none';
+      // Highlight search term in viewer
+      document.getElementById('localSearch').value = q;
+      localSearchFn();
+    });
+  });
+}
+
+function clearGlobalSearch() {
+  document.getElementById('globalSearch').value = '';
+  document.getElementById('searchDropdown').style.display = 'none';
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  const dd = document.getElementById('searchDropdown');
+  if (!dd) return;
+  if (!dd.contains(e.target) && e.target.id !== 'globalSearch' && !e.target.closest('.results-toolbar')) {
+    dd.style.display = 'none';
+  }
+});
+
+// ════════════════════════════════════════ SEARCH
+function globalSearchFn() { _matchState.global = 0; renderResultsTable(); }
+function localSearchFn()  { _matchState.local  = 0; if (state.selectedRow) showInViewer(state.selectedRow); }
+function fsSearchFn()     { _matchState.fs     = 0; if (state.selectedRow) showInViewer(state.selectedRow); }
+
+// ════════════════════════════════════════ SORT
+function sortResults(col) {
+  if (state.sortCol === col) state.sortDir *= -1;
+  else { state.sortCol = col; state.sortDir = 1; }
+  renderResultsTable();
+}
+
+// ════════════════════════════════════════ FULLSCREEN
+function openFullscreen() {
+  if (state.selectedRow) showInViewer(state.selectedRow);
+  document.getElementById('fullscreen-modal').classList.add('open');
+}
+function closeFullscreen() { document.getElementById('fullscreen-modal').classList.remove('open'); }
+
+function switchFsTab(name) {
+  document.querySelectorAll('.fs-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.fs-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById(`fs-pane-${name}`).classList.add('active');
+}
+
+// ════════════════════════════════════════ MISC
+function clearResults() {
+  state.results = [];
+  state.selectedRow = null;
+  renderResultsTable();
+  document.getElementById('rawReqContent').textContent = 'Select a result row to view the request.';
+  document.getElementById('rawRespContent').textContent = 'Select a result row to view the response.';
+  document.getElementById('progressBar').style.width = '0%';
+  document.getElementById('progressBar2').style.width = '0%';
+  document.getElementById('resultStats').textContent = '0 requests';
+}
+
+function exportCsv() {
+  const rows = [['#','Payload','Status','Length','Time(ms)','Marker','Matched']];
+  for (const r of state.results) rows.push([r.id, r.payload, r.status, r.length, r.time, r.markerLabel, r.matched]);
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = 'intruder_results.csv';
+  a.click();
+}
+
+function setStatus(cls, text) {
+  const el = document.getElementById('runStatus');
+  el.className = 'run-status' + (cls ? ' ' + cls : '');
+  el.textContent = text;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ════════════════════════════════════════ DIVIDER DRAG
+const divider = document.getElementById('divider');
+const leftPanel = document.getElementById('leftPanel');
+let dragging = false, startX = 0, startW = 0;
+divider.addEventListener('mousedown', e => {
+  dragging = true; startX = e.clientX; startW = leftPanel.offsetWidth;
+  divider.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const delta = e.clientX - startX;
+  const w = Math.max(280, Math.min(startW + delta, window.innerWidth - 280));
+  leftPanel.style.width = w + 'px';
+  leftPanel.style.minWidth = '0';
+});
+document.addEventListener('mouseup', () => {
+  dragging = false;
+  divider.classList.remove('dragging');
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+});
+
+// ════════════════════════════════════════ INIT
+updatePayloadSetSelector();
+onPayloadTypeChange();
+['numFrom','numTo','numStep','numFormat','bfCharset','bfMin','bfMax','dateFrom','dateTo','dateFormat'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateCounts);
+});
+</script>
+</body>
+</html>

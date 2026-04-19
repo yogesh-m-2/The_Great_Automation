@@ -16,15 +16,14 @@ class NmapThread(threading.Thread):
         self.daemon = True
 
     def run(self):
-        if stop_event.is_set():
-            return
         try:
+            if stop_event.is_set():
+                return
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(2)
             result = sock.connect_ex((target_host, self.port))
             sock.close()
             if result == 0:
-                # try banner grab
                 banner = ""
                 try:
                     sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,18 +42,18 @@ class NmapThread(threading.Thread):
                     f.write(line + "\n")
         except Exception:
             pass
-
-
-def count_threads():
-    return sum(1 for t in threading.enumerate() if isinstance(t, NmapThread))
+        finally:
+            task.release_slot()
 
 
 for i in range(start_index, len(target_ports), batch_size):
     batch = list(target_ports)[i:i + batch_size]
     for port in batch:
-        while count_threads() >= int(task.get_speed()):
-            time.sleep(0.5)
         if stop_event.is_set():
+            break
+        task.acquire_slot()
+        if stop_event.is_set():
+            task.release_slot()
             break
         NmapThread(port).start()
     if not stop_event.is_set():

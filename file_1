@@ -1,35 +1,35 @@
-ns4.cognizant.com  ->  203.99.197.115
-autodiscover.cognizant.com  ->  2603:1046:c04:1410::8, 40.104.66.104, 2603:1046:c04:101b::8, 40.99.31.184, 40.104.68.72, 2603:1046:c04:1413::8, 2603:1046:c04:1019::8, 2603:1046:c04:1017::8, 40.104.68.104, 2603:1046:c04:1400::8, 40.99.9.184, 40.104.66.184, 2603:1046:c04:104b::8, 52.98.57.168, 2603:1046:c04:89f::8, 40.104.66.200
-ns3.cognizant.com  ->  116.66.158.43
-www.cognizant.com  ->  151.101.159.10
-ns1.cognizant.com  ->  20.44.34.11
-smtp.cognizant.com  ->  203.99.199.27
 mail.cognizant.com  ->  20.219.177.144, 13.71.88.145
+ns1.cognizant.com  ->  20.44.34.11
+www.cognizant.com  ->  151.101.159.10
+smtp.cognizant.com  ->  203.99.199.27
+ns3.cognizant.com  ->  116.66.158.43
+autodiscover.cognizant.com  ->  52.98.56.216, 40.104.122.248, 2603:1046:c06:c76::8, 40.104.107.232, 2603:1046:c06:c15::8, 2603:1046:c06:c91::8, 2603:1046:c06:c4c::8, 40.104.135.88
+ns4.cognizant.com  ->  203.99.197.115
+news.cognizant.com  ->  104.17.29.170, 2606:4700::6811:1eaa, 104.17.31.170, 2606:4700::6811:1daa, 104.17.27.170, 104.17.30.170, 2606:4700::6811:1baa, 2606:4700::6811:1caa, 2606:4700::6811:1faa, 104.17.28.170
 ns5.cognizant.com  ->  27.118.33.212
-news.cognizant.com  ->  104.17.27.170, 104.17.30.170, 104.17.28.170, 2606:4700:83b2:48cf:8d76:427:6811:1baa, 104.17.31.170, 104.17.29.170
 moodle.cognizant.com  ->  20.235.166.174
 ai.cognizant.com  ->  151.101.159.10
-events.cognizant.com  ->  108.159.15.35, 108.159.15.60, 108.159.15.17, 108.159.15.121
-careers.cognizant.com  ->  104.18.21.249, 2606:4700:83b2:b4f4:176:427:cc40:af2f, 104.18.20.249
-mc.cognizant.com  ->  203.99.197.181
+events.cognizant.com  ->  52.84.205.53, 52.84.205.27, 52.84.205.80, 52.84.205.22
+careers.cognizant.com  ->  2606:4700::6812:14f9, 104.18.21.249, 2606:4700::6812:15f9, 104.18.20.249
 cm.cognizant.com  ->  203.99.214.45
+mc.cognizant.com  ->  203.99.197.181
 tms.cognizant.com  ->  203.99.197.181
 play.cognizant.com  ->  116.66.138.163
 ams.cognizant.com  ->  116.66.138.163
-pm-bounces.cognizant.com  ->  16.58.27.141, 18.119.225.101, 3.132.11.223
+pm-bounces.cognizant.com  ->  3.135.29.96, 18.222.67.79, 16.58.27.239
+global.cognizant.com  ->  3.215.172.219, 18.208.125.13, 52.54.96.194, 34.237.219.119, 3.92.120.28
 uat.cognizant.com  ->  151.101.159.10
-global.cognizant.com  ->  3.92.120.28, 18.208.125.13, 52.54.96.194, 34.237.219.119, 3.215.172.219
 leo.cognizant.com  ->  116.66.138.213
 ic.cognizant.com  ->  129.154.240.133
 vcs.cognizant.com  ->  27.118.38.4
 epay.cognizant.com  ->  34.160.74.21
 kr.cognizant.com  ->  203.99.214.26
-wise.cognizant.com  ->  2620:1ec:46::72, 2620:1ec:bdf::72, 13.107.213.72, 13.107.246.72
+wise.cognizant.com  ->  13.107.213.72, 13.107.246.72, 2620:1ec:46::72, 2620:1ec:bdf::72
 talent.cognizant.com  ->  34.95.85.19
-be.cognizant.com  ->  52.140.62.168
-marketplace.cognizant.com  ->  54.173.206.90, 100.55.123.175, 54.210.138.151, 34.237.109.188, 54.156.137.19, 3.216.215.83
+be.cognizant.com  ->  4.224.59.38
+marketplace.cognizant.com  ->  44.195.186.47, 54.173.104.110, 13.219.168.79, 3.216.57.38, 54.85.107.134, 50.19.211.71
+checkin.cognizant.com  ->  27.118.33.151
 camp.cognizant.com  ->  151.101.159.10
-checkin.cognizant.com  ->  27.118.43.87
 cdp.cognizant.com  ->  101.230.6.164
 ho.cognizant.com  ->  203.99.197.23
 holiday.cognizant.com  ->  116.66.136.81

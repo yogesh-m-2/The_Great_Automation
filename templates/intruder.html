@@ -499,18 +499,23 @@
     .viewer-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
     .viewer-content {
       flex: 1;
-      overflow: hidden;
+      overflow: auto;
       position: relative;
       min-height: 0;
     }
     .viewer-pane {
       display: none;
-      height: 100%;
-      overflow: auto;
+      min-height: 100%;
     }
     .viewer-pane.active { display: block; }
     .viewer-pane.render-pane { display: none; }
-    .viewer-pane.render-pane.active { display: flex; flex-direction: column; }
+    .viewer-pane.render-pane.active {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+    }
     .raw-view {
       font-family: 'JetBrains Mono', monospace;
       font-size: .77rem;
@@ -523,9 +528,10 @@
     .raw-view .hl { background: rgba(240, 180, 41, 0.25); border-radius: 2px; }
     .response-iframe {
       width: 100%;
-      flex: 1;
+      height: 100%;
       border: none;
       background: #fff;
+      display: block;
     }
 
     /* ── Fullscreen modal ── */
@@ -637,6 +643,31 @@
     .run-status.done    { color: var(--blue);  border-color: var(--blue);  background: #0d1e3a; }
     .run-status.error   { color: var(--red);   border-color: var(--red);   background: #2d1111; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.6; } }
+
+    /* Table fullscreen modal */
+    #table-fullscreen-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      background: var(--bg);
+      flex-direction: column;
+    }
+    #table-fullscreen-modal.open { display: flex; }
+    .tfs-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--s1);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .tfs-title { font-size: .82rem; color: var(--accent); font-weight: 600; }
+    .tfs-table-wrap {
+      flex: 1;
+      overflow-y: auto;
+    }
 
     .sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
   </style>
@@ -912,7 +943,7 @@ Connection: close"
 </div><!-- /tab-positions -->
 
 <!-- ══════════════════════════════════════════════ RESULTS TAB (hidden initially) -->
-<div style="display:none; flex:1; flex-direction:column; overflow:hidden; height:calc(100vh - 96px);" id="tab-results">
+<div style="display:none; flex-direction:column; overflow:hidden; position:fixed; top:96px; left:0; right:0; bottom:0;" id="tab-results">
 
   <!-- Results toolbar -->
   <div class="results-toolbar">
@@ -932,6 +963,7 @@ Connection: close"
     </div>
     <button class="btn btn-sm" onclick="clearResults()">Clear</button>
     <button class="btn btn-sm" onclick="exportCsv()">Export CSV</button>
+    <button class="btn btn-sm" onclick="openTableFullscreen()" title="Fullscreen results table">⛶ Table Fullscreen</button>
     <div style="margin-left:auto; font-size:.75rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">
       <span id="resultStats">0 requests</span>
     </div>
@@ -1047,6 +1079,39 @@ Connection: close"
     <div class="fs-pane fs-render" id="fs-pane-render">
       <iframe id="fsFrame" class="response-iframe" sandbox="allow-scripts" src="about:blank"></iframe>
     </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ TABLE FULLSCREEN MODAL -->
+<div id="table-fullscreen-modal">
+  <div class="tfs-header">
+    <span class="tfs-title">⛶ Results — Fullscreen</span>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div style="position:relative; display:flex; align-items:center; gap:4px;">
+        <input class="search-input" id="tfsSearch" placeholder="🔍 Search requests…" style="width:220px"
+          onkeydown="if(event.key==='Enter') runTfsSearch()">
+        <button class="btn btn-sm btn-accent" onclick="runTfsSearch()">Search</button>
+        <button class="btn btn-sm" onclick="clearTfsSearch()" title="Clear search">✕</button>
+      </div>
+      <span style="font-size:.75rem; color:var(--muted); font-family:'JetBrains Mono',monospace;" id="tfsStats">0 requests</span>
+      <button class="btn btn-sm btn-red" onclick="closeTableFullscreen()">✕ Close</button>
+    </div>
+  </div>
+  <div class="tfs-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th onclick="sortResults('id')">#<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('payload')">Payload<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('status')">Status<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('length')">Length<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('time')">Time (ms)<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('marker')">Marker<span class="sort-arrow">↕</span></th>
+          <th>Comment</th>
+        </tr>
+      </thead>
+      <tbody id="tfsResultsBody"></tbody>
+    </table>
   </div>
 </div>
 
@@ -1641,6 +1706,11 @@ function renderResultsTable() {
     tr.addEventListener('click', () => selectRow(r, tr));
     tbody.appendChild(tr);
   }
+  document.getElementById('resultStats').textContent = rows.length + ' / ' + state.results.length + ' requests';
+  // Keep TFS in sync if open
+  if (document.getElementById('table-fullscreen-modal').classList.contains('open')) {
+    renderTfsTable();
+  }
 }
 
 function selectRow(r, tr) {
@@ -1654,25 +1724,34 @@ function showInViewer(r) {
   const q = document.getElementById('localSearch').value;
   document.getElementById('rawReqContent').innerHTML = highlight(escHtml(r.rawReq), q);
   document.getElementById('rawRespContent').innerHTML = highlight(escHtml(r.rawResp), q);
-  // Render response
   const frame = document.getElementById('responseFrame');
   const ct = (r.contentType || '').toLowerCase();
-  function buildRenderHtml(body, isHtml) {
-    if (isHtml) return body;
-    let display = body;
-    if (ct.includes('json')) {
-      try { display = JSON.stringify(JSON.parse(body), null, 2); } catch(_) {}
-    }
-    return `<html><body style="margin:0;background:#0b0d14;color:#c9d1f0;font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;padding:14px">${display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</body></html>`;
+
+  function getOrigin() {
+    try { return new URL(document.getElementById('targetUrl').value.trim()).origin; } catch(_) { return ''; }
   }
+
+  function buildRenderHtml(body, isHtml) {
+    if (isHtml) {
+      const origin = getOrigin();
+      const baseTag = origin ? `<base href="${origin}/">` : '';
+      if (/<head[\s>]/i.test(body)) return body.replace(/(<head[^>]*>)/i, `$1${baseTag}`);
+      return baseTag + body;
+    }
+    let display = body;
+    if (ct.includes('json')) { try { display = JSON.stringify(JSON.parse(body), null, 2); } catch(_) {} }
+    return `<html><body style="margin:0;background:#fff;color:#111;font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;padding:14px">${display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</body></html>`;
+  }
+
   const isHtml = ct.includes('html') || (!ct && r.respBody.trimStart().startsWith('<'));
   const rendered = buildRenderHtml(r.respBody, isHtml);
-  // Use srcdoc — works with sandbox without needing allow-same-origin
+  frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
   frame.srcdoc = rendered;
-  // Fullscreen mirrors
   document.getElementById('fsReqContent').innerHTML = highlight(escHtml(r.rawReq), document.getElementById('fsSearch').value);
   document.getElementById('fsRawContent').innerHTML = highlight(escHtml(r.rawResp), document.getElementById('fsSearch').value);
-  document.getElementById('fsFrame').srcdoc = rendered;
+  const fsFrame = document.getElementById('fsFrame');
+  fsFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+  fsFrame.srcdoc = rendered;
 }
 
 function highlight(text, q) {
@@ -1838,7 +1917,67 @@ function clearResults() {
   document.getElementById('rawRespContent').textContent = 'Select a result row to view the response.';
   document.getElementById('progressBar').style.width = '0%';
   document.getElementById('progressBar2').style.width = '0%';
-  document.getElementById('resultStats').textContent = '0 requests';
+  document.getElementById('resultStats').textContent = '0 / 0 requests';
+}
+
+function openTableFullscreen() {
+  renderTfsTable();
+  document.getElementById('table-fullscreen-modal').classList.add('open');
+}
+function closeTableFullscreen() {
+  document.getElementById('table-fullscreen-modal').classList.remove('open');
+}
+function renderTfsTable() {
+  const body = document.getElementById('tfsResultsBody');
+  const q = document.getElementById('tfsSearch').value.trim().toLowerCase();
+  let rows = [...state.results];
+  if (q) rows = rows.filter(r =>
+    String(r.payload).toLowerCase().includes(q) ||
+    String(r.status).includes(q) ||
+    (r.rawReq||'').toLowerCase().includes(q) ||
+    (r.rawResp||'').toLowerCase().includes(q)
+  );
+  document.getElementById('tfsStats').textContent = rows.length + ' / ' + state.results.length + ' requests';
+  body.innerHTML = rows.map(r => {
+    const sc = r.status >= 200 && r.status < 300 ? 'status-2xx'
+             : r.status >= 300 && r.status < 400 ? 'status-3xx'
+             : r.status >= 400 && r.status < 500 ? 'status-4xx'
+             : r.status >= 500 ? 'status-5xx' : 'status-err';
+    return `<tr onclick="selectFromTfs(${r.id})" style="cursor:pointer">
+      <td>${r.id}</td>
+      <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis">${escHtml(String(r.payload))}</td>
+      <td class="${sc}">${r.status || 'ERR'}</td>
+      <td>${r.length}</td>
+      <td>${r.time}</td>
+      <td>${r.markerLabel||''}</td>
+      <td>${escHtml(r.comment||'')}</td>
+    </tr>`;
+  }).join('');
+}
+function selectFromTfs(id) {
+  const result = state.results.find(r => r.id === id);
+  if (!result) return;
+  closeTableFullscreen();
+  // Switch to results tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab')[3].classList.add('active');
+  document.getElementById('tab-positions').style.display = 'none';
+  document.getElementById('tab-results').style.display = 'flex';
+  // Select the row
+  setTimeout(() => {
+    const rows = document.querySelectorAll('#resultsBody tr');
+    rows.forEach(tr => {
+      if (parseInt(tr.cells[0]?.textContent) === id) {
+        selectRow(result, tr);
+        tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
+  }, 50);
+}
+function runTfsSearch() { renderTfsTable(); }
+function clearTfsSearch() {
+  document.getElementById('tfsSearch').value = '';
+  renderTfsTable();
 }
 
 function exportCsv() {

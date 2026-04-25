@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Repeater – The Great Automation</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+
+    :root {
+      --bg:       #0b0d14;
+      --s1:       #111420;
+      --s2:       #161a2c;
+      --s3:       #1c2138;
+      --border:   #252a45;
+      --border2:  #1e2340;
+      --accent:   #e8522a;
+      --accent2:  #ff6b3d;
+      --green:    #3dd68c;
+      --blue:     #4fa8e8;
+      --yellow:   #f0b429;
+      --purple:   #a78bfa;
+      --red:      #f87171;
+      --text:     #dde3f5;
+      --muted:    #6b7494;
+      --muted2:   #8891b8;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--s1);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .logo { font-size: .95rem; font-weight: 700; color: var(--accent); }
+    .page-title { font-size: .82rem; color: var(--muted2); border-left: 1px solid var(--border); padding-left: 14px; margin-left: 14px; }
+    .header-left { display: flex; align-items: center; }
+
+    /* ── Repeater tab bar ── */
+    .repeater-tabbar {
+      display: flex;
+      align-items: stretch;
+      background: var(--s1);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+    .repeater-tabbar::-webkit-scrollbar { display: none; }
+    .rtab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 16px;
+      height: 38px;
+      font-size: .8rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-right: 1px solid var(--border);
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s, background .15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .rtab:hover { color: var(--text); background: var(--s2); }
+    .rtab.active { color: var(--accent); border-bottom-color: var(--accent); background: var(--s2); }
+    .rtab-close {
+      width: 16px; height: 16px; border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .75rem; color: var(--muted);
+      transition: background .1s, color .1s;
+      flex-shrink: 0;
+    }
+    .rtab-close:hover { background: rgba(248,113,113,.2); color: var(--red); }
+    .rtab-add {
+      padding: 0 14px;
+      height: 38px;
+      display: flex; align-items: center;
+      font-size: 1rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color .1s;
+      flex-shrink: 0;
+    }
+    .rtab-add:hover { color: var(--accent); }
+
+    /* ── Tab content ── */
+    .tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; height: calc(100vh - 86px); }
+    .tab-content.active { display: flex; }
+
+    /* ── Request/Response split ── */
+    .rr-split {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .req-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 250px;
+    }
+    .resp-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .panel-title {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--muted2);
+      text-transform: uppercase;
+      letter-spacing: .6px;
+    }
+    .panel-tabs {
+      display: flex;
+      gap: 2px;
+    }
+    .ptab {
+      padding: 3px 10px;
+      font-size: .73rem;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background .12s, color .12s;
+    }
+    .ptab:hover { background: var(--s3); color: var(--text); }
+    .ptab.active { background: var(--s3); color: var(--accent); }
+
+    .divider-v {
+      width: 4px; background: var(--border); cursor: col-resize; flex-shrink: 0;
+      transition: background .15s;
+    }
+    .divider-v:hover, .divider-v.dragging { background: var(--accent); }
+
+    /* ── Target bar ── */
+    .target-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--s2);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    .target-method {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-size: .78rem;
+      padding: 5px 10px;
+      outline: none;
+      font-family: 'IBM Plex Sans', sans-serif;
+      cursor: pointer;
+    }
+    .target-url {
+      flex: 1;
+      min-width: 150px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      padding: 5px 10px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .target-url:focus { border-color: var(--accent); }
+
+    .btn {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--s3);
+      color: var(--text);
+      font-size: .78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .12s, border-color .12s;
+      white-space: nowrap;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+    .btn:hover { background: var(--s2); border-color: var(--muted); }
+    .btn-green  { background: rgba(61,214,140,.15); border-color: var(--green); color: var(--green); }
+    .btn-green:hover { background: rgba(61,214,140,.25); }
+    .btn-red    { background: rgba(248,113,113,.15); border-color: var(--red); color: var(--red); }
+    .btn-orange { background: rgba(232,82,42,.15); border-color: var(--accent); color: var(--accent2); }
+    .btn-orange:hover { background: rgba(232,82,42,.25); }
+    .btn-blue   { background: rgba(79,168,232,.15); border-color: var(--blue); color: var(--blue); }
+    .btn-blue:hover { background: rgba(79,168,232,.25); }
+    .btn-purple { background: rgba(167,139,250,.15); border-color: var(--purple); color: var(--purple); }
+    .btn-purple:hover { background: rgba(167,139,250,.25); }
+    .btn-sm { padding: 3px 9px; font-size: .73rem; }
+    .btn-icon { padding: 5px 8px; }
+
+    .send-btn {
+      padding: 6px 20px;
+      background: var(--accent);
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s;
+      font-family: 'IBM Plex Sans', sans-serif;
+    }
+    .send-btn:hover { background: var(--accent2); }
+    .send-btn:disabled { opacity: .5; cursor: default; }
+
+    /* ── Request editor ── */
+    .editor-area {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    textarea.req-editor {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      border: none;
+      color: #c9d1f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem;
+      line-height: 1.65;
+      padding: 14px 16px;
+      resize: none;
+      outline: none;
+      tab-size: 4;
+    }
+
+    /* ── Response viewer ── */
+    .resp-area {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    .resp-pane { display: none; width: 100%; height: 100%; }
+    .resp-pane.active { display: block; }
+    textarea.resp-raw {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      border: none;
+      color: #c9d1f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .8rem;
+      line-height: 1.65;
+      padding: 14px 16px;
+      resize: none;
+      outline: none;
+    }
+    .resp-render {
+      width: 100%;
+      height: 100%;
+      background: white;
+      border: none;
+    }
+    .resp-pretty {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: #c9d1f0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .78rem;
+      line-height: 1.6;
+      padding: 14px 16px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 5px 14px;
+      background: var(--s2);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      font-size: .72rem;
+      color: var(--muted2);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .stat-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .stat-label { color: var(--muted); }
+    .stat-val { font-weight: 600; }
+    .status-2xx { color: var(--green); }
+    .status-3xx { color: var(--blue); }
+    .status-4xx { color: var(--yellow); }
+    .status-5xx { color: var(--red); }
+
+    /* ── History sidebar (per-tab) ── */
+    .hist-sidebar {
+      width: 0;
+      overflow: hidden;
+      transition: width .2s;
+      border-left: 1px solid var(--border);
+      background: var(--s1);
+      display: flex;
+      flex-direction: column;
+    }
+    .hist-sidebar.open { width: 220px; }
+    .hs-header {
+      padding: 8px 12px;
+      font-size: .7rem;
+      font-weight: 700;
+      color: var(--muted2);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .hs-list { flex: 1; overflow-y: auto; }
+    .hs-item {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border2);
+      cursor: pointer;
+      font-size: .72rem;
+      transition: background .1s;
+    }
+    .hs-item:hover { background: var(--s2); }
+    .hs-method { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: .68rem; }
+    .hs-status { font-family: 'JetBrains Mono', monospace; font-size: .68rem; }
+    .hs-time { color: var(--muted); font-size: .65rem; margin-top: 2px; }
+
+    /* ── Empty / loading ── */
+    .resp-empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      gap: 10px;
+    }
+    .resp-empty .ei { font-size: 2.5rem; opacity: .3; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: var(--s2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 18px;
+      font-size: .8rem; color: var(--text);
+      z-index: 2000; transform: translateY(60px); opacity: 0;
+      transition: transform .25s, opacity .25s;
+      pointer-events: none;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .action-sep { width: 1px; height: 16px; background: var(--border); margin: 0 2px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span class="logo">⚡ The Great Automation</span>
+    <span class="page-title">Repeater</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a href="/proxy" style="font-size:.78rem;color:var(--muted2);text-decoration:none;">← Proxy</a>
+    <a href="/dashboard" style="font-size:.78rem;color:var(--muted);text-decoration:none;">Dashboard</a>
+    <a href="/logout" style="font-size:.78rem;color:var(--muted);text-decoration:none;">Sign out</a>
+  </div>
+</header>
+
+<!-- Repeater Tab Bar -->
+<div class="repeater-tabbar" id="repeaterTabBar">
+  <!-- tabs injected by JS -->
+  <div class="rtab-add" onclick="addRepeaterTab()" title="New tab">＋</div>
+</div>
+
+<!-- Tab contents container -->
+<div id="tabContents" style="flex:1;overflow:hidden;display:flex;flex-direction:column;"></div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════ STATE
+const state = {
+  tabs: [],
+  activeTabId: null,
+  tabCounter: 0,
+};
+
+// ════════════════════════════════════════ TAB MANAGEMENT
+function addRepeaterTab(opts = {}) {
+  const id = ++state.tabCounter;
+  const tab = {
+    id,
+    label: opts.label || `Tab ${id}`,
+    method: opts.method || 'GET',
+    url: opts.url || '',
+    rawRequest: opts.rawRequest || defaultRequest(opts.method || 'GET', opts.url || ''),
+    history: [],
+    currentResp: null,
+    histOpen: false,
+  };
+  state.tabs.push(tab);
+  renderTabBar();
+  renderAllContents();
+  activateTab(id);
+  return id;
+}
+
+function defaultRequest(method, url) {
+  try {
+    const u = new URL(url);
+    return `${method} ${u.pathname || '/'} HTTP/1.1\r\nHost: ${u.hostname}\r\nUser-Agent: TheGreatAutomation/1.0\r\nAccept: */*\r\nConnection: close\r\n\r\n`;
+  } catch {
+    return `${method} / HTTP/1.1\r\nHost: \r\nUser-Agent: TheGreatAutomation/1.0\r\nAccept: */*\r\nConnection: close\r\n\r\n`;
+  }
+}
+
+function activateTab(id) {
+  state.activeTabId = id;
+  renderTabBar();
+  document.querySelectorAll('.tab-content').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.tabId) === id);
+  });
+  // Populate URL field from request content on activation
+  setTimeout(() => onReqChange(id), 0);
+}
+
+function closeTab(id, e) {
+  e && e.stopPropagation();
+  state.tabs = state.tabs.filter(t => t.id !== id);
+  const content = document.querySelector(`.tab-content[data-tab-id="${id}"]`);
+  if (content) content.remove();
+  if (state.activeTabId === id) {
+    state.activeTabId = state.tabs.length ? state.tabs[state.tabs.length - 1].id : null;
+  }
+  renderTabBar();
+  if (state.activeTabId) {
+    document.querySelectorAll('.tab-content').forEach(el => {
+      el.classList.toggle('active', parseInt(el.dataset.tabId) === state.activeTabId);
+    });
+  } else {
+    addRepeaterTab();
+  }
+}
+
+function renameTab(id) {
+  const tab = getTab(id);
+  if (!tab) return;
+  const name = prompt('Tab name:', tab.label);
+  if (name) { tab.label = name; renderTabBar(); }
+}
+
+function getTab(id) { return state.tabs.find(t => t.id === id); }
+
+// ════════════════════════════════════════ RENDER TAB BAR
+function renderTabBar() {
+  const bar = document.getElementById('repeaterTabBar');
+  const addBtn = bar.querySelector('.rtab-add');
+  // Remove existing rtabs
+  bar.querySelectorAll('.rtab').forEach(el => el.remove());
+  // Insert tabs before add button
+  state.tabs.forEach(tab => {
+    const el = document.createElement('div');
+    el.className = 'rtab' + (tab.id === state.activeTabId ? ' active' : '');
+    el.dataset.tabId = tab.id;
+    el.innerHTML = `
+      <span ondblclick="renameTab(${tab.id})" title="Double-click to rename">${escHtml(tab.label)}</span>
+      <span class="rtab-close" onclick="closeTab(${tab.id}, event)" title="Close tab">✕</span>
+    `;
+    el.addEventListener('click', (e) => {
+      if (!e.target.classList.contains('rtab-close')) activateTab(tab.id);
+    });
+    bar.insertBefore(el, addBtn);
+  });
+}
+
+// ════════════════════════════════════════ RENDER TAB CONTENT
+function renderAllContents() {
+  state.tabs.forEach(tab => {
+    if (!document.querySelector(`.tab-content[data-tab-id="${tab.id}"]`)) {
+      createTabContent(tab);
+    }
+  });
+}
+
+function createTabContent(tab) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tab-content';
+  wrapper.dataset.tabId = tab.id;
+  wrapper.innerHTML = buildTabHTML(tab);
+  document.getElementById('tabContents').appendChild(wrapper);
+  setupTabDivider(tab.id);
+  setupTabHistDivider(tab.id);
+}
+
+function buildTabHTML(tab) {
+  return `
+  <!-- Target Bar -->
+  <div class="target-bar" id="targetBar-${tab.id}">
+    <select class="target-method" id="method-${tab.id}" onchange="onMethodChange(${tab.id})">
+      ${['GET','POST','PUT','DELETE','PATCH','HEAD','OPTIONS'].map(m =>
+        `<option ${m === tab.method ? 'selected' : ''}>${m}</option>`
+      ).join('')}
+    </select>
+    <input class="target-url" id="url-${tab.id}" placeholder="https://target.com/path" value="${escHtml(tab.url)}" oninput="onUrlChange(${tab.id})">
+    <button class="send-btn" id="sendBtn-${tab.id}" onclick="sendRequest(${tab.id})">Send</button>
+    <div class="action-sep"></div>
+    <button class="btn btn-sm btn-orange" onclick="sendToIntruder(${tab.id})" title="Send to Intruder">⚔ Intruder</button>
+    <button class="btn btn-sm btn-purple" onclick="openHistSidebar(${tab.id})" title="History">⏱ History</button>
+    <button class="btn btn-sm" onclick="clearTab(${tab.id})" title="Clear">Clear</button>
+  </div>
+
+  <!-- Split -->
+  <div class="rr-split" id="split-${tab.id}" style="height:calc(100% - 44px)">
+    <!-- Request panel -->
+    <div class="req-panel" id="reqPanel-${tab.id}" style="width:50%;">
+      <div class="panel-header">
+        <span class="panel-title">Request</span>
+        <div class="panel-tabs" id="reqTabs-${tab.id}">
+          <span class="ptab active" onclick="switchReqTab(${tab.id},'raw',this)">Raw</span>
+          <span class="ptab" onclick="switchReqTab(${tab.id},'headers',this)">Headers</span>
+          <span class="ptab" onclick="switchReqTab(${tab.id},'body',this)">Body</span>
+        </div>
+        <button class="btn btn-sm" style="margin-left:auto;" onclick="prettifyRequest(${tab.id})">✨ Prettify</button>
+      </div>
+      <div class="editor-area">
+        <textarea class="req-editor" id="reqEditor-${tab.id}" spellcheck="false" placeholder="Enter raw HTTP request or type a URL above…" oninput="onReqChange(${tab.id})" onpaste="setTimeout(()=>onReqChange(${tab.id}),0)">${escHtml(tab.rawRequest)}</textarea>
+      </div>
+    </div>
+
+    <div class="divider-v" id="divider-${tab.id}"></div>
+
+    <!-- Response panel -->
+    <div class="resp-panel" id="respPanel-${tab.id}">
+      <div class="panel-header">
+        <span class="panel-title">Response</span>
+        <div class="panel-tabs" id="respTabs-${tab.id}">
+          <span class="ptab active" onclick="switchRespTab(${tab.id},'raw',this)">Raw</span>
+          <span class="ptab" onclick="switchRespTab(${tab.id},'pretty',this)">Pretty</span>
+          <span class="ptab" onclick="switchRespTab(${tab.id},'render',this)">Render</span>
+          <span class="ptab" onclick="switchRespTab(${tab.id},'headers',this)">Headers</span>
+        </div>
+        <button class="btn btn-sm" style="margin-left:auto;" id="copyRespBtn-${tab.id}" onclick="copyResponse(${tab.id})" disabled>📋 Copy</button>
+      </div>
+      <div class="resp-area" id="respArea-${tab.id}">
+        <div class="resp-empty" id="respEmpty-${tab.id}">
+          <div class="ei">📭</div>
+          <div style="font-size:.82rem;">Hit Send to see the response</div>
+        </div>
+        <div class="resp-pane" id="respRaw-${tab.id}" style="display:none;">
+          <textarea class="resp-raw" id="respRawTA-${tab.id}" readonly></textarea>
+        </div>
+        <div class="resp-pane" id="respPretty-${tab.id}" style="display:none;">
+          <div class="resp-pretty" id="respPrettyEl-${tab.id}"></div>
+        </div>
+        <div class="resp-pane" id="respRender-${tab.id}" style="display:none;">
+          <iframe class="resp-render" id="respIframe-${tab.id}" title="Rendered response"></iframe>
+        </div>
+        <div class="resp-pane" id="respHeaders-${tab.id}" style="display:none;">
+          <textarea class="resp-raw" id="respHeadersTA-${tab.id}" readonly></textarea>
+        </div>
+      </div>
+      <!-- Status bar -->
+      <div class="status-bar" id="statusBar-${tab.id}">
+        <span class="stat-chip"><span class="stat-label">Status</span> <span class="stat-val" id="statStatus-${tab.id}">—</span></span>
+        <span class="stat-chip"><span class="stat-label">Length</span> <span class="stat-val" id="statLen-${tab.id}">—</span></span>
+        <span class="stat-chip"><span class="stat-label">Time</span>   <span class="stat-val" id="statTime-${tab.id}">—</span></span>
+        <span class="stat-chip"><span class="stat-label">MIME</span>   <span class="stat-val" id="statMime-${tab.id}" style="color:var(--muted)">—</span></span>
+      </div>
+    </div>
+
+    <!-- History sidebar -->
+    <div class="hist-sidebar" id="histSidebar-${tab.id}">
+      <div class="hs-header">
+        <span>History</span>
+        <span style="cursor:pointer;color:var(--muted)" onclick="closeHistSidebar(${tab.id})">✕</span>
+      </div>
+      <div class="hs-list" id="histList-${tab.id}"></div>
+    </div>
+  </div>
+  `;
+}
+
+// ════════════════════════════════════════ SEND REQUEST
+async function sendRequest(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+
+  const url   = document.getElementById(`url-${tabId}`)?.value.trim() || tab.url;
+  const method = document.getElementById(`method-${tabId}`)?.value || tab.method;
+  const raw   = document.getElementById(`reqEditor-${tabId}`)?.value || '';
+
+  tab.url = url;
+  tab.method = method;
+  tab.rawRequest = raw;
+
+  if (!url) { showToast('⚠ Enter a URL first'); return; }
+
+  // Parse raw request for headers+body
+  const lines = raw.split(/\r?\n/);
+  const headers = {};
+  let bodyStart = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === '') { bodyStart = i + 1; break; }
+    const idx = lines[i].indexOf(':');
+    if (idx > 0) {
+      headers[lines[i].slice(0, idx).trim()] = lines[i].slice(idx + 1).trim();
+    }
+  }
+  const body = bodyStart >= 0 ? lines.slice(bodyStart).join('\n') : '';
+
+  const btn = document.getElementById(`sendBtn-${tabId}`);
+  btn.textContent = '⏳ Sending…';
+  btn.disabled = true;
+
+  // Update status bar
+  document.getElementById(`statStatus-${tabId}`).textContent = '…';
+  document.getElementById(`statLen-${tabId}`).textContent = '…';
+  document.getElementById(`statTime-${tabId}`).textContent = '…';
+
+  const t0 = Date.now();
+  try {
+    const res = await fetch('/intruder-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, method, headers, body, follow_redirects: true }),
+    });
+    const data = await res.json();
+    const elapsed = Date.now() - t0;
+
+    tab.currentResp = data;
+    tab.history.unshift({ method, url, status: data.status, length: data.body?.length || 0, time: elapsed, raw: data.raw, body: data.body, ts: Date.now() });
+
+    populateResponse(tabId, data, elapsed);
+    renderHistList(tabId);
+  } catch (e) {
+    populateResponse(tabId, { status: 0, raw: `[Network error: ${e.message}]`, body: `[Network error: ${e.message}]` }, Date.now() - t0);
+  } finally {
+    btn.textContent = 'Send';
+    btn.disabled = false;
+  }
+}
+
+function populateResponse(tabId, data, elapsed) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+
+  const statusEl = document.getElementById(`statStatus-${tabId}`);
+  const lenEl    = document.getElementById(`statLen-${tabId}`);
+  const timeEl   = document.getElementById(`statTime-${tabId}`);
+  const mimeEl   = document.getElementById(`statMime-${tabId}`);
+
+  const sc = data.status;
+  statusEl.textContent = sc || 'ERR';
+  statusEl.className   = 'stat-val ' + (sc >= 200 && sc < 300 ? 'status-2xx' : sc >= 300 && sc < 400 ? 'status-3xx' : sc >= 400 && sc < 500 ? 'status-4xx' : sc >= 500 ? 'status-5xx' : '');
+  lenEl.textContent    = data.body ? (data.body.length + ' B') : '—';
+  timeEl.textContent   = elapsed + 'ms';
+  mimeEl.textContent   = (data.content_type || '').split(';')[0] || '—';
+
+  // Fill all panes
+  document.getElementById(`respRawTA-${tabId}`).value     = data.raw || '';
+  document.getElementById(`respPrettyEl-${tabId}`).textContent = tryPretty(data.body || '', data.content_type || '');
+  document.getElementById(`respHeadersTA-${tabId}`).value = extractHeaders(data.raw || '');
+
+  // Render iframe — use srcdoc with base tag so relative CSS/JS resolves
+  const iframe = document.getElementById(`respIframe-${tabId}`);
+  const tab2 = getTab(tabId);
+  let renderBody = data.body || '';
+  try {
+    const origin = new URL(tab2 ? tab2.url : '').origin;
+    const baseTag = `<base href="${origin}/">`;
+    if (/<head[\s>]/i.test(renderBody)) {
+      renderBody = renderBody.replace(/(<head[^>]*>)/i, `$1${baseTag}`);
+    } else {
+      renderBody = baseTag + renderBody;
+    }
+  } catch(_) {}
+  iframe.srcdoc = renderBody;
+
+  // Show raw pane by default, hide empty state
+  document.getElementById(`respEmpty-${tabId}`).style.display = 'none';
+  document.querySelectorAll(`#respArea-${tabId} .resp-pane`).forEach(p => {
+    p.style.display = p.id === `respRaw-${tabId}` ? 'block' : 'none';
+    p.classList.toggle('active', p.id === `respRaw-${tabId}`);
+  });
+  // Reset resp tabs
+  document.querySelectorAll(`#respTabs-${tabId} .ptab`).forEach((t, i) => t.classList.toggle('active', i === 0));
+  document.getElementById(`copyRespBtn-${tabId}`).disabled = false;
+}
+
+function tryPretty(body, mime) {
+  if (mime.includes('json') || body.trimStart().startsWith('{') || body.trimStart().startsWith('[')) {
+    try { return JSON.stringify(JSON.parse(body), null, 2); } catch {}
+  }
+  return body;
+}
+
+function extractHeaders(raw) {
+  const idx = raw.indexOf('\r\n\r\n');
+  return idx >= 0 ? raw.slice(0, idx) : raw.split('\n\n')[0];
+}
+
+// ════════════════════════════════════════ RESP TAB SWITCH
+function switchRespTab(tabId, name, el) {
+  document.querySelectorAll(`#respTabs-${tabId} .ptab`).forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll(`#respArea-${tabId} .resp-pane`).forEach(p => {
+    p.style.display = 'none'; p.classList.remove('active');
+  });
+  const pane = document.getElementById(`resp${capitalize(name)}-${tabId}`);
+  if (pane) { pane.style.display = 'block'; pane.classList.add('active'); }
+}
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ════════════════════════════════════════ REQ TAB SWITCH
+function switchReqTab(tabId, name, el) {
+  document.querySelectorAll(`#reqTabs-${tabId} .ptab`).forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const ta = document.getElementById(`reqEditor-${tabId}`);
+  if (!ta) return;
+  const raw = tab.rawRequest;
+  if (name === 'raw') {
+    ta.value = raw;
+  } else if (name === 'headers') {
+    ta.value = extractHeaders(raw);
+  } else if (name === 'body') {
+    const idx = raw.indexOf('\r\n\r\n');
+    ta.value = idx >= 0 ? raw.slice(idx + 4) : '';
+  }
+}
+
+// ════════════════════════════════════════ PRETTIFY
+function prettifyRequest(tabId) {
+  const ta = document.getElementById(`reqEditor-${tabId}`);
+  if (!ta) return;
+  // Try JSON body prettify
+  const raw = ta.value;
+  const idx = raw.indexOf('\r\n\r\n');
+  if (idx < 0) return;
+  const head = raw.slice(0, idx + 4);
+  const body = raw.slice(idx + 4);
+  try {
+    const pretty = JSON.stringify(JSON.parse(body), null, 2);
+    ta.value = head + pretty;
+    showToast('✨ Body prettified');
+  } catch {
+    showToast('⚠ Body is not valid JSON');
+  }
+}
+
+// ════════════════════════════════════════ METHOD CHANGE → update raw request first line
+function onMethodChange(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const method = document.getElementById(`method-${tabId}`).value;
+  tab.method = method;
+  // Update first line of raw request
+  const ta = document.getElementById(`reqEditor-${tabId}`);
+  if (ta) {
+    const lines = ta.value.split(/\r?\n/);
+    if (lines.length > 0) {
+      const firstParts = lines[0].split(' ');
+      firstParts[0] = method;
+      lines[0] = firstParts.join(' ');
+      ta.value = lines.join('\r\n');
+    }
+  }
+}
+
+function onUrlChange(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const newUrl = document.getElementById(`url-${tabId}`).value.trim();
+  tab.url = newUrl;
+  // Same logic as intruder's targetUrl listener — just update Host header
+  try {
+    const u = new URL(newUrl);
+    const editorEl = document.getElementById(`reqEditor-${tabId}`);
+    if (!editorEl) return;
+    const val = editorEl.value;
+    const updated = val.replace(/^Host:.*$/mi, `Host: ${u.host}`);
+    if (updated !== val) { editorEl.value = updated; tab.rawRequest = updated; }
+  } catch(_) {}
+}
+
+// When user types in the raw editor, sync URL field from Host + request line
+function onReqChange(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const editorEl = document.getElementById(`reqEditor-${tabId}`);
+  if (!editorEl) return;
+  const text = editorEl.value;
+  tab.rawRequest = text;
+  if (!text.trim()) return;
+  // Same logic as intruder autoPopulateUrl
+  const lines = text.split(/\r?\n/);
+  const parts = (lines[0] || '').split(' ');
+  const method = parts[0] || 'GET';
+  const path   = parts[1] || '/';
+  let host = '';
+  for (const line of lines.slice(1)) {
+    if (line.toLowerCase().startsWith('host:')) { host = line.slice(5).trim(); break; }
+  }
+  if (!host) return;
+  const scheme = (host.includes(':80') && !host.includes(':443')) || host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
+  const fullUrl = path.startsWith('http') ? path : `${scheme}://${host}${path}`;
+  // Update URL field
+  const urlEl = document.getElementById(`url-${tabId}`);
+  if (urlEl) urlEl.value = fullUrl;
+  tab.url = fullUrl;
+  // Update method dropdown
+  const methodEl = document.getElementById(`method-${tabId}`);
+  if (methodEl) methodEl.value = method;
+  tab.method = method;
+}
+
+// ════════════════════════════════════════ COPY RESPONSE
+function copyResponse(tabId) {
+  const ta = document.getElementById(`respRawTA-${tabId}`);
+  if (ta) navigator.clipboard.writeText(ta.value).then(() => showToast('📋 Response copied'));
+}
+
+// ════════════════════════════════════════ SEND TO INTRUDER
+function sendToIntruder(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const raw = document.getElementById(`reqEditor-${tabId}`)?.value || tab.rawRequest;
+  localStorage.setItem('proxy_to_intruder', JSON.stringify({ raw, url: tab.url, method: tab.method }));
+  window.open('/intruder?from=repeater', '_blank');
+  showToast('⚔ Opened in Intruder');
+}
+
+// ════════════════════════════════════════ HISTORY SIDEBAR
+function openHistSidebar(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  tab.histOpen = !tab.histOpen;
+  document.getElementById(`histSidebar-${tabId}`).classList.toggle('open', tab.histOpen);
+}
+
+function closeHistSidebar(tabId) {
+  const tab = getTab(tabId);
+  if (tab) tab.histOpen = false;
+  document.getElementById(`histSidebar-${tabId}`).classList.remove('open');
+}
+
+function renderHistList(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const list = document.getElementById(`histList-${tabId}`);
+  if (!list) return;
+  list.innerHTML = tab.history.map((h, i) => {
+    const sc = h.status >= 200 && h.status < 300 ? 'status-2xx' : h.status >= 400 ? 'status-4xx' : '';
+    return `<div class="hs-item" onclick="loadHistoryItem(${tabId}, ${i})">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="hs-method" style="color:var(--accent)">${h.method}</span>
+        <span class="hs-status ${sc}">${h.status || 'ERR'}</span>
+        <span style="color:var(--muted);font-size:.65rem;margin-left:auto">${h.time}ms</span>
+      </div>
+      <div style="color:var(--muted2);font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${escHtml(h.url)}</div>
+      <div class="hs-time">${new Date(h.ts).toLocaleTimeString()}</div>
+    </div>`;
+  }).join('');
+}
+
+function loadHistoryItem(tabId, idx) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const h = tab.history[idx];
+  if (!h) return;
+  populateResponse(tabId, { status: h.status, raw: h.raw, body: h.body }, h.time);
+  showToast(`Loaded response #${idx + 1}`);
+}
+
+// ════════════════════════════════════════ CLEAR TAB
+function clearTab(tabId) {
+  const tab = getTab(tabId);
+  if (!tab) return;
+  const ta = document.getElementById(`reqEditor-${tabId}`);
+  const m  = document.getElementById(`method-${tabId}`).value;
+  if (ta) ta.value = defaultRequest(m, '');
+  document.getElementById(`url-${tabId}`).value = '';
+  document.getElementById(`respEmpty-${tabId}`).style.display = '';
+  document.querySelectorAll(`#respArea-${tabId} .resp-pane`).forEach(p => { p.style.display = 'none'; p.classList.remove('active'); });
+  document.getElementById(`statStatus-${tabId}`).textContent = '—';
+  document.getElementById(`statLen-${tabId}`).textContent = '—';
+  document.getElementById(`statTime-${tabId}`).textContent = '—';
+  document.getElementById(`statMime-${tabId}`).textContent = '—';
+  tab.url = ''; tab.rawRequest = ta?.value || '';
+}
+
+// ════════════════════════════════════════ DIVIDER DRAG
+function setupTabDivider(tabId) {
+  const divider  = document.getElementById(`divider-${tabId}`);
+  const reqPanel = document.getElementById(`reqPanel-${tabId}`);
+  let dragging = false, startX = 0, startW = 0;
+  if (!divider || !reqPanel) return;
+  divider.addEventListener('mousedown', e => {
+    dragging = true; startX = e.clientX; startW = reqPanel.offsetWidth;
+    divider.classList.add('dragging');
+    document.body.style.cssText += ';cursor:col-resize;user-select:none';
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    reqPanel.style.width = Math.max(200, Math.min(startW + e.clientX - startX, window.innerWidth - 200)) + 'px';
+    reqPanel.style.minWidth = '0';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false; divider.classList.remove('dragging');
+    document.body.style.cursor = ''; document.body.style.userSelect = '';
+  });
+}
+
+function setupTabHistDivider(tabId) {
+  // Hist sidebar opens/closes via toggle button — no drag needed here
+}
+
+// ════════════════════════════════════════ TOAST
+let _toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ════════════════════════════════════════ UTILS
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════ INIT
+// Check if opened from proxy with a request in URL params
+(function init() {
+  const params = new URLSearchParams(window.location.search);
+  const rawParam = params.get('raw');
+  const urlParam  = params.get('url');
+  const meth      = params.get('method') || 'GET';
+
+  if (rawParam || urlParam) {
+    addRepeaterTab({ rawRequest: rawParam || defaultRequest(meth, urlParam || ''), url: urlParam || '', method: meth, label: urlParam ? new URL(urlParam).hostname : 'Proxy' });
+    showToast('📨 Request loaded from Proxy');
+  } else {
+    addRepeaterTab();
+  }
+
+  // Also check localStorage (from intruder send-to)
+  const stored = localStorage.getItem('proxy_to_repeater');
+  if (stored) {
+    localStorage.removeItem('proxy_to_repeater');
+    try {
+      const d = JSON.parse(stored);
+      addRepeaterTab({ rawRequest: d.raw || '', url: d.url || '', method: d.method || 'GET', label: 'From Proxy' });
+    } catch {}
+  }
+})();
+</script>
+</body>
+</html>

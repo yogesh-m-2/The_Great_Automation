@@ -1,0 +1,12 @@
+[14:15:54.330] Loading script /Users/yogesh/Documents/Github/The_Great_Automation/proxy_addon.py
+[14:15:54.330] HTTP(S) proxy listening at 127.0.0.1:8080.
+[14:15:57.088][127.0.0.1:53084] client connect
+[14:15:57.232][127.0.0.1:53084] server connect en.wikipedia.org:443 ([2001:df2:e500:ed1a::1]:443)
+127.0.0.1:53084: GET https://en.wikipedia.org/api/rest_v1/page/summary/Secon… HTTP/2.0
+     << HTTP/2.0 200 OK 948b
+127.0.0.1:53084: GET https://en.wikipedia.org/wiki/Undergraduate_education HTTP/2.0
+     << HTTP/2.0 304 Not Modified 0b
+127.0.0.1:53084: GET https://en.wikipedia.org/w/load.php?lang=en&modules=sit… HTTP/2.0
+     << HTTP/2.0 304 Not Modified 0b
+127.0.0.1:53084: GET https://en.wikipedia.org/w/load.php?lang=en&modules=ext… HTTP/2.0
+     << HTTP/2.0 304 Not Modified 0b

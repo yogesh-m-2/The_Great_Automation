@@ -682,6 +682,9 @@
   </div>
   <div class="header-right">
     <span class="run-status" id="runStatus">Idle</span>
+    <a href="/proxy" style="text-decoration:none">
+      <button class="btn btn-sm">🔀 Proxy</button>
+    </a>
     <a href="/dashboard" style="text-decoration:none">
       <button class="btn btn-sm">← Dashboard</button>
     </a>
@@ -983,6 +986,7 @@ Connection: close"
           <th onclick="sortResults('length')">Length<span class="sort-arrow">↕</span></th>
           <th onclick="sortResults('time')">Time (ms)<span class="sort-arrow">↕</span></th>
           <th onclick="sortResults('marker')">Marker<span class="sort-arrow">↕</span></th>
+          <th onclick="sortResults('matched')">Matched<span class="sort-arrow">↕</span></th>
           <th>Comment</th>
         </tr>
       </thead>
@@ -1011,7 +1015,7 @@ Connection: close"
         <div class="raw-view" id="rawRespContent">Select a result row to view the response.</div>
       </div>
       <div class="viewer-pane render-pane" id="vp-render-resp">
-        <iframe id="responseFrame" class="response-iframe" sandbox="allow-scripts" src="about:blank"></iframe>
+        <iframe id="responseFrame" class="response-iframe" src="about:blank"></iframe>
       </div>
     </div>
   </div>
@@ -1077,7 +1081,7 @@ Connection: close"
     <div class="fs-pane active" id="fs-pane-req"><div class="raw-view" id="fsReqContent"></div></div>
     <div class="fs-pane" id="fs-pane-raw"><div class="raw-view" id="fsRawContent"></div></div>
     <div class="fs-pane fs-render" id="fs-pane-render">
-      <iframe id="fsFrame" class="response-iframe" sandbox="allow-scripts" src="about:blank"></iframe>
+      <iframe id="fsFrame" class="response-iframe" src="about:blank"></iframe>
     </div>
   </div>
 </div>
@@ -1107,6 +1111,7 @@ Connection: close"
           <th onclick="sortResults('length')">Length<span class="sort-arrow">↕</span></th>
           <th onclick="sortResults('time')">Time (ms)<span class="sort-arrow">↕</span></th>
           <th onclick="sortResults('marker')">Marker<span class="sort-arrow">↕</span></th>
+          <th>Matched</th>
           <th>Comment</th>
         </tr>
       </thead>
@@ -1136,13 +1141,13 @@ document.querySelectorAll('.tab').forEach(t => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     const name = t.dataset.tab;
-    document.getElementById('tab-positions').style.display = name === 'positions' ? 'flex' : 'none';
-    document.getElementById('tab-results').style.display   = name === 'results'   ? 'flex' : 'none';
+    // Results and Settings are full-page overlays; Positions and Payloads share the main layout
+    document.getElementById('tab-positions').style.display = (name === 'positions' || name === 'payloads') ? 'flex' : 'none';
+    document.getElementById('tab-results').style.display   = name === 'results'   ? 'flex'  : 'none';
     document.getElementById('tab-settings').style.display  = name === 'settings'  ? 'block' : 'none';
-    // payloads tab lives inside right-panel of positions, just switch there
+    // When payloads tab is active, scroll right panel into view
     if (name === 'payloads') {
-      document.getElementById('tab-positions').style.display = 'flex';
-      document.querySelectorAll('.tab')[0].classList.remove('active');
+      document.querySelector('.right-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });
 });
@@ -1702,6 +1707,10 @@ function renderResultsTable() {
       <td>${r.time}</td>
       <td>${r.markerLabel}</td>
       <td>${r.matched ? '<span style="color:var(--green)">✓ match</span>' : ''}</td>
+      <td><input type="text" value="${escHtml(r.comment||'')}" placeholder="add note…"
+        style="background:transparent;border:none;color:var(--muted2);font-size:.75rem;width:100%;outline:none;font-family:'IBM Plex Sans',sans-serif;"
+        onclick="event.stopPropagation()"
+        oninput="updateComment(${r.id}, this.value)"></td>
     `;
     tr.addEventListener('click', () => selectRow(r, tr));
     tbody.appendChild(tr);
@@ -1745,12 +1754,12 @@ function showInViewer(r) {
 
   const isHtml = ct.includes('html') || (!ct && r.respBody.trimStart().startsWith('<'));
   const rendered = buildRenderHtml(r.respBody, isHtml);
-  frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+
   frame.srcdoc = rendered;
   document.getElementById('fsReqContent').innerHTML = highlight(escHtml(r.rawReq), document.getElementById('fsSearch').value);
   document.getElementById('fsRawContent').innerHTML = highlight(escHtml(r.rawResp), document.getElementById('fsSearch').value);
   const fsFrame = document.getElementById('fsFrame');
-  fsFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+
   fsFrame.srcdoc = rendered;
 }
 
@@ -1950,6 +1959,7 @@ function renderTfsTable() {
       <td>${r.length}</td>
       <td>${r.time}</td>
       <td>${r.markerLabel||''}</td>
+      <td>${r.matched ? '<span style="color:var(--green)">✓</span>' : ''}</td>
       <td>${escHtml(r.comment||'')}</td>
     </tr>`;
   }).join('');
@@ -1990,6 +2000,11 @@ function exportCsv() {
   a.click();
 }
 
+function updateComment(id, val) {
+  const r = state.results.find(r => r.id === id);
+  if (r) r.comment = val;
+}
+
 function setStatus(cls, text) {
   const el = document.getElementById('runStatus');
   el.className = 'run-status' + (cls ? ' ' + cls : '');
@@ -2027,6 +2042,29 @@ document.addEventListener('mouseup', () => {
 });
 
 // ════════════════════════════════════════ INIT
+// Read request sent from proxy — runs on load AND when tab is refocused
+function _loadFromProxy() {
+  try {
+    const stored = localStorage.getItem('proxy_to_intruder');
+    if (!stored) return;
+    localStorage.removeItem('proxy_to_intruder');
+    const d = JSON.parse(stored);
+    if (d.raw) {
+      const ta = document.getElementById('requestEditor');
+      if (ta) ta.value = d.raw;
+    }
+    if (d.url) {
+      const urlEl = document.getElementById('targetUrl');
+      if (urlEl) urlEl.value = d.url;
+    }
+  } catch(e) {
+    console.error('loadFromProxy error:', e);
+  }
+}
+// Run on load
+_loadFromProxy();
+// Poll every 500ms so it picks up data even if tab was already open
+setInterval(_loadFromProxy, 500);
 updatePayloadSetSelector();
 onPayloadTypeChange();
 ['numFrom','numTo','numStep','numFormat','bfCharset','bfMin','bfMax','dateFrom','dateTo','dateFormat'].forEach(id => {

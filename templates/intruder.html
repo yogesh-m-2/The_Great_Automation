@@ -1004,6 +1004,9 @@ Connection: close"
         <input class="search-input" id="localSearch" placeholder="🔍 Search here…" oninput="localSearchFn()" style="width:160px">
         <button class="btn btn-sm" onclick="navigateMatch('local',-1)">▲</button>
         <button class="btn btn-sm" onclick="navigateMatch('local',1)">▼</button>
+        <button class="btn btn-sm btn-purple" onclick="sendSelectedToRepeater()" id="sendRepeaterBtn" style="display:none">↻ Send to Repeater</button>
+        <button class="btn btn-sm btn-orange" onclick="sendSelectedToIntruder()" id="sendIntruderBtn2" style="display:none">⚔ Send to Intruder</button>
+        <button class="btn btn-sm" onclick="popoutViewer()">⧉ Popout</button>
         <button class="btn btn-sm" onclick="openFullscreen()">⛶ Fullscreen</button>
       </div>
     </div>
@@ -1074,6 +1077,7 @@ Connection: close"
       <input class="search-input" id="fsSearch" placeholder="🔍 Search…" oninput="fsSearchFn()">
       <button class="btn btn-sm" onclick="navigateMatch('fs',-1)">▲</button>
       <button class="btn btn-sm" onclick="navigateMatch('fs',1)">▼</button>
+      <button class="btn btn-sm btn-purple" onclick="sendSelectedToRepeater()">↻ Send to Repeater</button>
       <button class="btn btn-sm" onclick="closeFullscreen()">✕ Close</button>
     </div>
   </div>
@@ -1727,6 +1731,11 @@ function selectRow(r, tr) {
   tr.classList.add('selected');
   state.selectedRow = r;
   showInViewer(r);
+  // Show action buttons
+  const sb = document.getElementById('sendRepeaterBtn');
+  const si = document.getElementById('sendIntruderBtn2');
+  if (sb) sb.style.display = '';
+  if (si) si.style.display = '';
 }
 
 function showInViewer(r) {
@@ -2041,8 +2050,101 @@ document.addEventListener('mouseup', () => {
   document.body.style.userSelect = '';
 });
 
-// ════════════════════════════════════════ INIT
-// Read request sent from proxy — runs on load AND when tab is refocused
+// ════════════════════════════════════════ SEND TO REPEATER / INTRUDER (from results)
+function sendSelectedToRepeater() {
+  if (!state.selectedRow) return;
+  const r = state.selectedRow;
+  localStorage.removeItem('proxy_to_repeater');
+  localStorage.setItem('proxy_to_repeater', JSON.stringify({
+    raw: r.rawReq || '',
+    url: document.getElementById('targetUrl').value || '',
+    method: r.rawReq ? (r.rawReq.split(' ')[0] || 'GET') : 'GET',
+  }));
+  const w = window.open('/repeater?from=intruder', '_blank');
+  if (!w) alert('Allow pop-ups for this site');
+}
+
+function sendSelectedToIntruder() {
+  if (!state.selectedRow) return;
+  const r = state.selectedRow;
+  localStorage.removeItem('proxy_to_intruder');
+  localStorage.setItem('proxy_to_intruder', JSON.stringify({
+    raw: r.rawReq || '',
+    url: document.getElementById('targetUrl').value || '',
+    method: r.rawReq ? (r.rawReq.split(' ')[0] || 'GET') : 'GET',
+  }));
+  // Load into current intruder editor instead of opening new tab
+  const ta = document.getElementById('requestEditor');
+  if (ta) {
+    ta.value = r.rawReq || '';
+    syncMarkersFromText();
+    updateMarkerCount();
+    updatePayloadSetSelector();
+    autoPopulateUrl();
+  }
+  // Switch to positions tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab')[0].classList.add('active');
+  document.getElementById('tab-positions').style.display = 'flex';
+  document.getElementById('tab-results').style.display = 'none';
+  document.getElementById('tab-settings').style.display = 'none';
+}
+
+// ════════════════════════════════════════ POPOUT VIEWER
+function popoutViewer() {
+  if (!state.selectedRow) { alert('Select a result row first.'); return; }
+  const r = state.selectedRow;
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Viewer — #${r.id} ${r.payload}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0b0d14;color:#dde3f5;font-family:'JetBrains Mono',monospace;font-size:12px;display:flex;flex-direction:column;height:100vh}
+  .tabs{display:flex;background:#111420;border-bottom:1px solid #252a45;padding:0 14px;gap:2px;flex-shrink:0}
+  .tab{padding:9px 16px;font-size:.8rem;color:#6b7494;cursor:pointer;border-bottom:2px solid transparent}
+  .tab.active{color:#e8522a;border-bottom-color:#e8522a}
+  .pane{display:none;flex:1;overflow:auto;padding:14px 16px;white-space:pre-wrap;word-break:break-all;line-height:1.65;color:#c9d1f0}
+  .pane.active{display:block}
+  iframe.pane{background:#fff;border:none}
+  iframe.pane.active{display:block}
+  .toolbar{padding:8px 14px;background:#111420;border-bottom:1px solid #252a45;display:flex;gap:8px;align-items:center;flex-shrink:0;font-size:.8rem;color:#8891b8}
+  .badge{padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600}
+  .s2xx{color:#3dd68c}.s4xx{color:#f0b429}.s5xx{color:#f87171}.serr{color:#6b7494}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <span>#${r.id}</span>
+  <span class="badge ${r.status>=200&&r.status<300?'s2xx':r.status>=400&&r.status<500?'s4xx':r.status>=500?'s5xx':'serr'}">${r.status||'ERR'}</span>
+  <span>${r.length}B</span>
+  <span>${r.time}ms</span>
+  <span style="color:#e8522a;margin-left:8px">${(r.payload||'').slice(0,80)}</span>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="show('req',this)">Request</div>
+  <div class="tab" onclick="show('resp',this)">Response (Raw)</div>
+  <div class="tab" onclick="show('render',this)">Response (Rendered)</div>
+</div>
+<div class="pane active" id="req">${r.rawReq.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+<div class="pane" id="resp">${r.rawResp.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+<iframe class="pane" id="render" srcdoc="${r.respBody.replace(/"/g,'&quot;').replace(/\\/g,'\\\\').replace(/\n/g,'\\n')}"></iframe>
+<script>
+function show(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+<\/script>
+</body></html>`;
+  const blob = new Blob([html], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'width=1000,height=700,menubar=no,toolbar=no,location=no');
+}
+
+// ════════════════════════════════════════ LOAD FROM PROXY/REPEATER
 function _loadFromProxy() {
   try {
     const stored = localStorage.getItem('proxy_to_intruder');
@@ -2052,19 +2154,21 @@ function _loadFromProxy() {
     if (d.raw) {
       const ta = document.getElementById('requestEditor');
       if (ta) ta.value = d.raw;
+      syncMarkersFromText();
+      updateMarkerCount();
+      updatePayloadSetSelector();
+      autoPopulateUrl();
     }
     if (d.url) {
       const urlEl = document.getElementById('targetUrl');
       if (urlEl) urlEl.value = d.url;
     }
-  } catch(e) {
-    console.error('loadFromProxy error:', e);
-  }
+  } catch(e) { console.error(e); }
 }
-// Run on load
 _loadFromProxy();
-// Poll every 500ms so it picks up data even if tab was already open
 setInterval(_loadFromProxy, 500);
+
+// ════════════════════════════════════════ INIT
 updatePayloadSetSelector();
 onPayloadTypeChange();
 ['numFrom','numTo','numStep','numFormat','bfCharset','bfMin','bfMax','dateFrom','dateTo','dateFormat'].forEach(id => {

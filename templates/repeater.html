@@ -245,6 +245,48 @@
     .send-btn:hover { background: var(--accent2); }
     .send-btn:disabled { opacity: .5; cursor: default; }
 
+    /* ── Split Send button + dropdown ── */
+    .send-group { position: relative; display: inline-flex; }
+    .send-group .send-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .send-caret {
+      padding: 6px 9px;
+      background: var(--accent);
+      border: none;
+      border-left: 1px solid rgba(0,0,0,.25);
+      border-top-right-radius: 5px;
+      border-bottom-right-radius: 5px;
+      color: white;
+      font-size: .7rem;
+      cursor: pointer;
+      transition: background .15s;
+      display: flex; align-items: center;
+    }
+    .send-caret:hover { background: var(--accent2); }
+    .send-caret:disabled { opacity: .5; cursor: default; }
+    .send-menu {
+      position: fixed;
+      min-width: 220px;
+      background: var(--s2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 8px 28px rgba(0,0,0,.45);
+      padding: 4px;
+      z-index: 9999;
+      display: none;
+    }
+    .send-menu.open { display: block; }
+    .send-menu-item {
+      display: flex; flex-direction: column; gap: 1px;
+      padding: 7px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .send-menu-item:hover { background: var(--s3); }
+    .send-menu-item .smi-title { font-size: .76rem; color: var(--text); font-weight: 500; }
+    .send-menu-item .smi-desc  { font-size: .66rem; color: var(--muted); }
+    .send-menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+
     /* ── Request editor ── */
     .editor-area {
       flex: 1;
@@ -550,7 +592,33 @@ function buildTabHTML(tab) {
       ).join('')}
     </select>
     <input class="target-url" id="url-${tab.id}" placeholder="https://target.com/path" value="${escHtml(tab.url)}" oninput="onUrlChange(${tab.id})">
-    <button class="send-btn" id="sendBtn-${tab.id}" onclick="sendRequest(${tab.id})">Send</button>
+    <div class="send-group">
+      <button class="send-btn" id="sendBtn-${tab.id}" onclick="sendRequest(${tab.id})">Send</button>
+      <button class="send-caret" id="sendCaret-${tab.id}" onclick="toggleSendMenu(${tab.id}, event)" title="More send options">▾</button>
+      <div class="send-menu" id="sendMenu-${tab.id}">
+        <div class="send-menu-item" onclick="sendRequest(${tab.id}, 'normal')">
+          <span class="smi-title">Send</span>
+          <span class="smi-desc">Send the request as-is</span>
+        </div>
+        <div class="send-menu-item" onclick="sendRequest(${tab.id}, 'urlencode')">
+          <span class="smi-title">Send URL-encoded</span>
+          <span class="smi-desc">Percent-encode the query string values</span>
+        </div>
+        <div class="send-menu-item" onclick="sendRequest(${tab.id}, 'urlencode-all')">
+          <span class="smi-title">Send fully URL-encoded</span>
+          <span class="smi-desc">Encode all special chars in path + query</span>
+        </div>
+        <div class="send-menu-sep"></div>
+        <div class="send-menu-item" onclick="sendRequest(${tab.id}, 'no-redirect')">
+          <span class="smi-title">Send (no redirects)</span>
+          <span class="smi-desc">Don't follow 3xx responses</span>
+        </div>
+        <div class="send-menu-item" onclick="sendRequest(${tab.id}, 'strip-cookies')">
+          <span class="smi-title">Send without cookies</span>
+          <span class="smi-desc">Drop the Cookie header for this send</span>
+        </div>
+      </div>
+    </div>
     <div class="action-sep"></div>
     <button class="btn btn-sm btn-orange" onclick="sendToIntruder(${tab.id})" title="Send to Intruder">⚔ Intruder</button>
     <button class="btn btn-sm btn-purple" onclick="openHistSidebar(${tab.id})" title="History">⏱ History</button>
@@ -629,13 +697,169 @@ function buildTabHTML(tab) {
 }
 
 // ════════════════════════════════════════ SEND REQUEST
-async function sendRequest(tabId) {
+// ════════════════════════════════════════ SEND MENU + ENCODING
+function toggleSendMenu(tabId, ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById(`sendMenu-${tabId}`);
+  const caret = document.getElementById(`sendCaret-${tabId}`);
+  if (!menu) return;
+  const wasOpen = menu.classList.contains('open');
+  document.querySelectorAll('.send-menu.open').forEach(m => m.classList.remove('open'));
+  if (!wasOpen) {
+    menu.classList.add('open');
+    // Position the fixed menu directly under the caret, right-aligned
+    if (caret) {
+      const r = caret.getBoundingClientRect();
+      const mw = menu.offsetWidth || 220;
+      let left = r.right - mw;
+      if (left < 8) left = 8;
+      menu.style.top  = (r.bottom + 4) + 'px';
+      menu.style.left = left + 'px';
+    }
+  }
+}
+
+function closeSendMenu(tabId) {
+  const menu = document.getElementById(`sendMenu-${tabId}`);
+  if (menu) menu.classList.remove('open');
+}
+
+// Close any open send-menu when clicking elsewhere
+document.addEventListener('click', e => {
+  if (!e.target.closest('.send-group')) {
+    document.querySelectorAll('.send-menu.open').forEach(m => m.classList.remove('open'));
+  }
+});
+
+// Encode the URL. queryOnly=true → encode only query-string values.
+// queryOnly=false → also encode reserved/special chars in the path.
+// Strict: also percent-encodes the chars encodeURIComponent leaves alone
+// ( ' ! ( ) * ~ ), which matters for injection payloads like category='
+function strictEncode(s) {
+  return encodeURIComponent(s).replace(/[!'()*~]/g, c =>
+    '%' + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+
+function applyUrlEncoding(url, encodeAll) {
+  try {
+    const u = new URL(url);
+    // Re-encode query param values
+    const params = [];
+    for (const [k, v] of u.searchParams.entries()) {
+      params.push(`${strictEncode(k)}=${strictEncode(v)}`);
+    }
+    const query = params.length ? '?' + params.join('&') : '';
+    let path = u.pathname;
+    if (encodeAll) {
+      // Encode special chars in each path segment but keep the slashes
+      path = path.split('/').map(seg => strictEncode(decodeURIComponent(seg))).join('/');
+    }
+    return `${u.protocol}//${u.host}${path}${query}${u.hash}`;
+  } catch {
+    // Not a parseable URL — encode everything after the first ?
+    const qIdx = url.indexOf('?');
+    if (qIdx < 0) return encodeAll ? strictEncode(url) : url;
+    const base = url.slice(0, qIdx);
+    const qs = url.slice(qIdx + 1);
+    const enc = qs.split('&').map(pair => {
+      const eq = pair.indexOf('=');
+      if (eq < 0) return strictEncode(pair);
+      return `${strictEncode(pair.slice(0, eq))}=${strictEncode(pair.slice(eq + 1))}`;
+    }).join('&');
+    return `${base}?${enc}`;
+  }
+}
+
+// Encode a request-line target like "/filter?category='" (path + optional query).
+// encodeAll → also encode special chars in the path segments.
+function encodeRequestPath(target, encodeAll) {
+  // Don't touch absolute-form targets that include scheme (rare in request line)
+  const hashIdx = target.indexOf('#');
+  const hash = hashIdx >= 0 ? target.slice(hashIdx) : '';
+  const noHash = hashIdx >= 0 ? target.slice(0, hashIdx) : target;
+  const qIdx = noHash.indexOf('?');
+  let path = qIdx >= 0 ? noHash.slice(0, qIdx) : noHash;
+  const qs  = qIdx >= 0 ? noHash.slice(qIdx + 1) : null;
+
+  if (encodeAll) {
+    path = path.split('/').map(seg => {
+      try { return strictEncode(decodeURIComponent(seg)); }
+      catch { return strictEncode(seg); }
+    }).join('/');
+  }
+
+  let query = '';
+  if (qs !== null) {
+    const enc = qs.split('&').map(pair => {
+      const eq = pair.indexOf('=');
+      const dec = s => { try { return decodeURIComponent(s); } catch { return s; } };
+      if (eq < 0) return strictEncode(dec(pair));
+      return `${strictEncode(dec(pair.slice(0, eq)))}=${strictEncode(dec(pair.slice(eq + 1)))}`;
+    }).join('&');
+    query = '?' + enc;
+  }
+  return path + query + hash;
+}
+
+async function sendRequest(tabId, mode = 'normal') {
+  closeSendMenu(tabId);
   const tab = getTab(tabId);
   if (!tab) return;
 
-  const url   = document.getElementById(`url-${tabId}`)?.value.trim() || tab.url;
+  let url   = document.getElementById(`url-${tabId}`)?.value.trim() || tab.url;
   const method = document.getElementById(`method-${tabId}`)?.value || tab.method;
-  const raw   = document.getElementById(`reqEditor-${tabId}`)?.value || '';
+  let raw   = document.getElementById(`reqEditor-${tabId}`)?.value || '';
+
+  // Apply URL-encoding modes. Encode the request-line path in the raw editor
+  // (the source of truth for what was typed below), then re-sync the URL field.
+  if (mode === 'urlencode' || mode === 'urlencode-all') {
+    let changed = false;
+
+    // 1) Encode the path/query on the request line in the raw editor
+    if (raw.trim()) {
+      const lines = raw.split(/\r?\n/);
+      const parts = (lines[0] || '').split(' ');
+      if (parts.length >= 2 && parts[1]) {
+        const newPath = encodeRequestPath(parts[1], mode === 'urlencode-all');
+        if (newPath !== parts[1]) {
+          parts[1] = newPath;
+          lines[0] = parts.join(' ');
+          raw = lines.join('\r\n');
+          const ta = document.getElementById(`reqEditor-${tabId}`);
+          if (ta) ta.value = raw;
+          changed = true;
+        }
+      }
+    }
+
+    // 2) Encode the URL field too (in case the request was sent from there)
+    const encodedUrl = applyUrlEncoding(url, mode === 'urlencode-all');
+    if (encodedUrl !== url) {
+      url = encodedUrl;
+      const urlEl = document.getElementById(`url-${tabId}`);
+      if (urlEl) urlEl.value = url;
+      changed = true;
+    } else if (changed) {
+      // Raw changed but URL field didn't reflect — rebuild URL from raw
+      try {
+        const lines = raw.split(/\r?\n/);
+        const p = (lines[0] || '').split(' ')[1] || '/';
+        let host = '';
+        for (const line of lines.slice(1)) {
+          if (line.toLowerCase().startsWith('host:')) { host = line.slice(5).trim(); break; }
+        }
+        if (host && !p.startsWith('http')) {
+          const scheme = host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
+          url = `${scheme}://${host}${p}`;
+          const urlEl = document.getElementById(`url-${tabId}`);
+          if (urlEl) urlEl.value = url;
+        }
+      } catch(_) {}
+    }
+
+    showToast(changed ? '🔒 URL-encoded' : 'Nothing to encode');
+  }
 
   tab.url = url;
   tab.method = method;
@@ -656,9 +880,20 @@ async function sendRequest(tabId) {
   }
   const body = bodyStart >= 0 ? lines.slice(bodyStart).join('\n') : '';
 
+  // Strip cookies for this send if requested
+  if (mode === 'strip-cookies') {
+    for (const k of Object.keys(headers)) {
+      if (k.toLowerCase() === 'cookie') delete headers[k];
+    }
+  }
+
+  const followRedirects = mode !== 'no-redirect';
+
   const btn = document.getElementById(`sendBtn-${tabId}`);
+  const caret = document.getElementById(`sendCaret-${tabId}`);
   btn.textContent = '⏳ Sending…';
   btn.disabled = true;
+  if (caret) caret.disabled = true;
 
   // Update status bar
   document.getElementById(`statStatus-${tabId}`).textContent = '…';
@@ -670,7 +905,7 @@ async function sendRequest(tabId) {
     const res = await fetch('/intruder-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, method, headers, body, follow_redirects: true }),
+      body: JSON.stringify({ url, method, headers, body, follow_redirects: followRedirects }),
     });
     const data = await res.json();
     const elapsed = Date.now() - t0;
@@ -685,6 +920,7 @@ async function sendRequest(tabId) {
   } finally {
     btn.textContent = 'Send';
     btn.disabled = false;
+    if (caret) caret.disabled = false;
   }
 }
 
@@ -817,24 +1053,59 @@ function onMethodChange(tabId) {
   }
 }
 
+let _syncing = false;
+
 function onUrlChange(tabId) {
+  if (_syncing) return;
   const tab = getTab(tabId);
   if (!tab) return;
   const newUrl = document.getElementById(`url-${tabId}`).value.trim();
   tab.url = newUrl;
-  // Same logic as intruder's targetUrl listener — just update Host header
+  if (!newUrl) return;
+
+  const editorEl = document.getElementById(`reqEditor-${tabId}`);
+  if (!editorEl) return;
+
+  // Derive path-and-query + host from the URL
+  let pathQuery = '', host = '';
   try {
     const u = new URL(newUrl);
-    const editorEl = document.getElementById(`reqEditor-${tabId}`);
-    if (!editorEl) return;
-    const val = editorEl.value;
-    const updated = val.replace(/^Host:.*$/mi, `Host: ${u.host}`);
-    if (updated !== val) { editorEl.value = updated; tab.rawRequest = updated; }
-  } catch(_) {}
+    pathQuery = (u.pathname || '/') + (u.search || '') + (u.hash || '');
+    host = u.host;
+  } catch(_) {
+    // Not a full URL — treat whatever's typed as the path
+    pathQuery = newUrl.startsWith('/') ? newUrl : '/' + newUrl;
+  }
+
+  _syncing = true;
+  try {
+    const lines = editorEl.value.split(/\r?\n/);
+    // Update request-line path (keep method + HTTP version)
+    if (lines.length > 0) {
+      const parts = lines[0].split(' ');
+      if (parts.length >= 2) {
+        parts[1] = pathQuery;
+        lines[0] = parts.join(' ');
+      }
+    }
+    // Update Host header if we have one
+    if (host) {
+      let hasHost = false;
+      for (let i = 1; i < lines.length; i++) {
+        if (/^host:/i.test(lines[i])) { lines[i] = `Host: ${host}`; hasHost = true; break; }
+      }
+      if (!hasHost && lines.length > 1) lines.splice(1, 0, `Host: ${host}`);
+    }
+    const updated = lines.join('\r\n');
+    if (updated !== editorEl.value) { editorEl.value = updated; tab.rawRequest = updated; }
+  } finally {
+    _syncing = false;
+  }
 }
 
 // When user types in the raw editor, sync URL field from Host + request line
 function onReqChange(tabId) {
+  if (_syncing) return;
   const tab = getTab(tabId);
   if (!tab) return;
   const editorEl = document.getElementById(`reqEditor-${tabId}`);
@@ -842,7 +1113,6 @@ function onReqChange(tabId) {
   const text = editorEl.value;
   tab.rawRequest = text;
   if (!text.trim()) return;
-  // Same logic as intruder autoPopulateUrl
   const lines = text.split(/\r?\n/);
   const parts = (lines[0] || '').split(' ');
   const method = parts[0] || 'GET';
@@ -854,14 +1124,20 @@ function onReqChange(tabId) {
   if (!host) return;
   const scheme = (host.includes(':80') && !host.includes(':443')) || host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
   const fullUrl = path.startsWith('http') ? path : `${scheme}://${host}${path}`;
-  // Update URL field
-  const urlEl = document.getElementById(`url-${tabId}`);
-  if (urlEl) urlEl.value = fullUrl;
-  tab.url = fullUrl;
-  // Update method dropdown
-  const methodEl = document.getElementById(`method-${tabId}`);
-  if (methodEl) methodEl.value = method;
-  tab.method = method;
+
+  _syncing = true;
+  try {
+    // Update URL field
+    const urlEl = document.getElementById(`url-${tabId}`);
+    if (urlEl) urlEl.value = fullUrl;
+    tab.url = fullUrl;
+    // Update method dropdown
+    const methodEl = document.getElementById(`method-${tabId}`);
+    if (methodEl) methodEl.value = method;
+    tab.method = method;
+  } finally {
+    _syncing = false;
+  }
 }
 
 // ════════════════════════════════════════ COPY RESPONSE

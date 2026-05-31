@@ -23,9 +23,23 @@ class InterceptAddon:
 addon = InterceptAddon()
 
 def _build_raw_request(req):
-    first   = f"{req.method} {req.path} HTTP/{req.http_version}\r\n"
-    headers = "".join(f"{k}: {v}\r\n" for k, v in req.headers.items())
-    body    = req.content.decode(errors="replace") if req.content else ""
+    # req.http_version is already like "HTTP/2.0" or "HTTP/1.1" — don't prefix again
+    ver = req.http_version if str(req.http_version).startswith("HTTP/") else f"HTTP/{req.http_version}"
+    first = f"{req.method} {req.path} {ver}\r\n"
+
+    # HTTP/2 splits cookies into multiple header frames; mitmproxy's headers
+    # collapse duplicate names by joining with ", " (a comma), which is INVALID
+    # for the Cookie header (must be "; "). Rebuild Cookie crumbs with semicolons.
+    header_lines = []
+    for k, v in req.headers.items():
+        if k.lower() == "cookie":
+            # Split any comma-joined crumbs and re-join with the correct "; "
+            crumbs = [c.strip() for c in v.replace(", ", ";").split(";") if c.strip()]
+            v = "; ".join(crumbs)
+        header_lines.append(f"{k}: {v}\r\n")
+    headers = "".join(header_lines)
+
+    body = req.content.decode(errors="replace") if req.content else ""
     return first + headers + "\r\n" + body
 
 def get_queue():

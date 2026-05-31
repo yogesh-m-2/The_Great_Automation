@@ -1465,47 +1465,90 @@ def intruder_proxy():
         return json.dumps({"error": "Unauthorized"}), 401
 
     data = request.get_json()
-    url             = data.get("url", "").strip()
-    method          = data.get("method", "GET").upper()
-    headers         = data.get("headers", {})
-    body            = data.get("body", "")
+    url              = data.get("url", "").strip()
+    method           = data.get("method", "GET").upper()
+    raw_headers_in   = data.get("headers", [])
+    body             = data.get("body", "")
     follow_redirects = data.get("follow_redirects", True)
 
     if not url:
         return json.dumps({"error": "No URL provided"}), 400
 
-    # Strip hop-by-hop headers that requests lib handles itself
-    skip = {'host', 'content-length', 'connection', 'transfer-encoding', 'te'}
-    clean_headers = {k: v for k, v in headers.items() if k.lower() not in skip}
+    # Headers may arrive as an ordered list of [name, value] pairs (preferred —
+    # preserves duplicate header names) or, for backward compatibility, a dict.
+    if isinstance(raw_headers_in, dict):
+        header_pairs = list(raw_headers_in.items())
+    else:
+        header_pairs = [(p[0], p[1]) for p in raw_headers_in if len(p) >= 2]
+
+    # Hop-by-hop headers urllib3 must set itself; drop anything the client sent.
+    # NOTE: Host is intentionally NOT stripped — pentests may need a spoofed or
+    # duplicate Host. If the client sends none, urllib3 derives one from the URL.
+    skip = {"content-length", "connection", "transfer-encoding", "te"}
+    clean_pairs = []
+    for k, v in header_pairs:
+        if k.lower() in skip:
+            continue
+        v = v.strip() if isinstance(v, str) else v
+        # HTTP/2 cookie crumbs sometimes arrive comma-joined (invalid). The Cookie
+        # header must use "; " between name=value pairs. Normalize defensively.
+        if k.lower() == "cookie" and isinstance(v, str) and ", " in v:
+            crumbs = [c.strip() for c in v.replace(", ", ";").split(";") if c.strip()]
+            v = "; ".join(crumbs)
+        clean_pairs.append((k, v))
+
+    # HTTPHeaderDict preserves duplicate header names and order, so two Host /
+    # X-Forwarded-For / etc. headers go out on the wire as distinct headers.
+    from urllib3 import HTTPHeaderDict, PoolManager
+    from urllib3.exceptions import HTTPError as _Urllib3Error
+    send_headers = HTTPHeaderDict()
+    for k, v in clean_pairs:
+        send_headers.add(k, v)
 
     try:
-        resp = req_lib.request(
+        http = PoolManager(
+            cert_reqs="CERT_NONE",  # allow self-signed certs
+            retries=False,
+            timeout=15.0,
+        )
+        resp = http.request(
             method,
             url,
-            headers=clean_headers,
-            data=body.encode() if body else None,
-            allow_redirects=follow_redirects,
-            timeout=15,
-            verify=False,  # allow self-signed certs
+            body=body.encode() if body else None,
+            headers=send_headers,
+            redirect=follow_redirects,
+            preload_content=True,
+            decode_content=True,  # auto-decompress gzip/deflate/br
         )
-        # resp.text auto-decompresses gzip/deflate — strip encoding headers
-        # so the client doesn't try to decompress plain text again
-        skip_resp = {'content-encoding', 'content-length', 'transfer-encoding'}
-        raw_headers = "\r\n".join(
+        status = resp.status
+        reason = getattr(resp, "reason", "") or ""
+        body_text = resp.data.decode("utf-8", errors="replace")
+
+        # Build a printable raw response. Drop encoding/length headers since the
+        # body is already decompressed; recompute Content-Length.
+        skip_resp = {"content-encoding", "content-length", "transfer-encoding"}
+        resp_header_lines = "\r\n".join(
             f"{k}: {v}" for k, v in resp.headers.items()
             if k.lower() not in skip_resp
         )
-        body_text = resp.text
-        raw = (f"HTTP/1.1 {resp.status_code} {resp.reason}\r\n"
-               f"{raw_headers}\r\nContent-Length: {len(body_text.encode())}\r\n\r\n"
+        raw = (f"HTTP/1.1 {status} {reason}\r\n"
+               f"{resp_header_lines}\r\nContent-Length: {len(body_text.encode())}\r\n\r\n"
                f"{body_text}")
+
+        # The headers we actually sent (list of pairs, duplicates intact).
+        sent = [[k, v] for k, v in clean_pairs]
+        final_url = getattr(resp, "geturl", lambda: url)() or url
+
         return json.dumps({
-            "status":       resp.status_code,
+            "status":       status,
             "body":         body_text,
             "raw":          raw,
             "content_type": resp.headers.get("Content-Type", ""),
+            "sent_headers": sent,
+            "final_url":    final_url,
+            "redirected":   final_url != url,
         })
-    except RequestException as e:
+    except (_Urllib3Error, Exception) as e:
         return json.dumps({
             "status": 0,
             "body":   f"[Error: {e}]",

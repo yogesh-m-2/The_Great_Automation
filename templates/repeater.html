@@ -867,24 +867,24 @@ async function sendRequest(tabId, mode = 'normal') {
 
   if (!url) { showToast('⚠ Enter a URL first'); return; }
 
-  // Parse raw request for headers+body
+  // Parse raw request for headers+body.
+  // Headers are an ORDERED LIST of [name, value] pairs so duplicate header
+  // names (e.g. two Host or X-Forwarded-For for smuggling/bypass tests) survive.
   const lines = raw.split(/\r?\n/);
-  const headers = {};
+  let headers = [];
   let bodyStart = -1;
   for (let i = 1; i < lines.length; i++) {
     if (lines[i].trim() === '') { bodyStart = i + 1; break; }
     const idx = lines[i].indexOf(':');
     if (idx > 0) {
-      headers[lines[i].slice(0, idx).trim()] = lines[i].slice(idx + 1).trim();
+      headers.push([lines[i].slice(0, idx).trim(), lines[i].slice(idx + 1).trim()]);
     }
   }
   const body = bodyStart >= 0 ? lines.slice(bodyStart).join('\n') : '';
 
   // Strip cookies for this send if requested
   if (mode === 'strip-cookies') {
-    for (const k of Object.keys(headers)) {
-      if (k.toLowerCase() === 'cookie') delete headers[k];
-    }
+    headers = headers.filter(([k]) => k.toLowerCase() !== 'cookie');
   }
 
   const followRedirects = mode !== 'no-redirect';

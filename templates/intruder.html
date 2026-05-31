@@ -1600,7 +1600,8 @@ async function sendRequest(rawReq, combo, reqNum, urlEncode, targetUrl) {
   const firstLine = lines[0] || '';
   const [method, path] = firstLine.split(' ');
   let host = '';
-  const headers = {};
+  // Ordered list of [name, value] pairs so duplicate header names survive.
+  const headers = [];
   let bodyStart = -1;
   for (let i = 1; i < lines.length; i++) {
     if (lines[i] === '') { bodyStart = i + 1; break; }
@@ -1608,7 +1609,7 @@ async function sendRequest(rawReq, combo, reqNum, urlEncode, targetUrl) {
     if (colon > 0) {
       const key = lines[i].slice(0, colon).trim().toLowerCase();
       const val = lines[i].slice(colon + 1).trim();
-      headers[key] = val;
+      headers.push([key, val]);
       if (key === 'host') host = val;
     }
   }

@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blind SQL Injector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background: #0d1117;
+            color: #e6edf3;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #30363d;
+            padding-bottom: 15px;
+        }
+        
+        .header h1 {
+            color: #58a6ff;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            color: #8b949e;
+            font-size: 13px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+        
+        .panel-title {
+            color: #79c0ff;
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            color: #8b949e;
+            font-size: 12px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            color: #e6edf3;
+            border-radius: 4px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+        
+        .form-group textarea {
+            resize: vertical;
+            min-height: 150px;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 10px 15px;
+            background: #238636;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        
+        button:hover:not(:disabled) {
+            background: #2ea043;
+            box-shadow: 0 0 10px rgba(35, 134, 54, 0.3);
+        }
+        
+        button:disabled {
+            background: #30363d;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        button.danger {
+            background: #da3633;
+        }
+        
+        button.danger:hover:not(:disabled) {
+            background: #f85149;
+        }
+        
+        .output-panel {
+            grid-column: 1 / -1;
+            display: none;
+        }
+        
+        .output-panel.active {
+            display: block;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #30363d;
+        }
+        
+        .tab {
+            padding: 8px 12px;
+            background: #0d1117;
+            border: 1px solid transparent;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            border-bottom-color: #58a6ff;
+            color: #58a6ff;
+        }
+        
+        .tab:hover {
+            color: #c9d1d9;
+        }
+        
+        .tab-content {
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .log-line {
+            padding: 4px 0;
+            font-size: 11px;
+            color: #8b949e;
+            border-bottom: 1px solid #21262d;
+        }
+        
+        .log-line.success {
+            color: #3fb950;
+        }
+        
+        .log-line.error {
+            color: #f85149;
+        }
+        
+        .log-line.info {
+            color: #79c0ff;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #30363d;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #58a6ff, #79c0ff);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .injection-point-selector {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 8px;
+        }
+        
+        .injection-point-item {
+            display: flex;
+            align-items: center;
+            padding: 6px;
+            margin-bottom: 4px;
+            background: #0d1117;
+            border-radius: 3px;
+        }
+        
+        .injection-point-item input[type="radio"] {
+            margin-right: 8px;
+            width: auto;
+        }
+        
+        .injection-point-item label {
+            margin: 0;
+            flex: 1;
+        }
+        
+        .stat-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            color: #8b949e;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        
+        .stat-value {
+            color: #58a6ff;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 4px;
+        }
+        
+        .extraction-result {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        
+        .extraction-result .key {
+            color: #79c0ff;
+            font-weight: bold;
+        }
+        
+        .extraction-result .value {
+            color: #3fb950;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ Blind SQL Injector</h1>
+            <p>Boolean-based &amp; Time-based SQL Injection Automation Tool</p>
+            <div style="margin-top:10px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap;">
+                <a href="/dashboard" style="font-size:.8rem;color:#94a3b8;text-decoration:none;">← Dashboard</a>
+                <a href="/proxy" style="font-size:.8rem;color:#94a3b8;text-decoration:none;">Proxy</a>
+                <a href="/repeater" style="font-size:.8rem;color:#94a3b8;text-decoration:none;">Repeater</a>
+                <a href="/intruder" style="font-size:.8rem;color:#94a3b8;text-decoration:none;">Intruder</a>
+                <a href="/logout" style="font-size:.8rem;color:#94a3b8;text-decoration:none;">Sign out</a>
+            </div>
+        </div>
+        
+        <div class="main-grid">
+            <!-- Left Panel: Configuration -->
+            <div class="panel">
+                <div class="panel-title">📋 Request Configuration</div>
+                
+                <div class="form-group">
+                    <label>HTTP Request (Raw Format)</label>
+                    <div style="display:flex;gap:8px;margin-bottom:6px;">
+                        <button type="button" onclick="addMarker()"
+                            style="background:#fb923c;color:#0f1117;border:none;border-radius:6px;
+                                   padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;">
+                            § Add Marker
+                        </button>
+                        <button type="button" onclick="clearMarkers()"
+                            style="background:#1e2235;color:#94a3b8;border:1px solid #2d3148;
+                                   border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">
+                            ✕ Clear Markers
+                        </button>
+                    </div>
+                    <textarea id="rawRequest" placeholder="Paste your exact request. Select the value you want to inject into (e.g. the TrackingId value) and click § Add Marker.&#10;&#10;GET /filter?category=Gifts HTTP/2.0&#10;Host: target.com&#10;Cookie: TrackingId=§abc123§; session=..."></textarea>
+                    <p style="color:#8b949e;font-size:11px;margin-top:6px;">
+                        Wrap the injection point in <code style="color:#fb923c;">§ §</code> markers.
+                        The request is sent <strong>exactly as typed</strong>; the payload is placed
+                        only at the marker.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Options -->
+            <div class="panel">
+                <div class="panel-title">⚙️ Injection Settings</div>
+                
+                <div class="form-group">
+                    <label>Database Type</label>
+                    <select id="databaseType">
+                        <option value="auto">Auto-detect</option>
+                        <option value="mysql">MySQL/MariaDB</option>
+                        <option value="postgresql">PostgreSQL</option>
+                        <option value="mssql">SQL Server</option>
+                        <option value="oracle">Oracle</option>
+                        <option value="sqlite">SQLite</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Injection Type</label>
+                    <select id="injectionType">
+                        <option value="boolean">Boolean-based (Recommended)</option>
+                        <option value="time">Time-based</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>True Indicator (matched in status line, headers, or body when TRUE)</label>
+                    <input type="text" id="trueIndicator" placeholder="body text, or 'HTTP 200', or 'X-Cache: HIT'" value="Welcome">
+                    <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:#94a3b8;cursor:pointer;">
+                        <input type="checkbox" id="caseSensitive" style="width:auto;cursor:pointer;">
+                        Case-sensitive match
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12px;color:#94a3b8;cursor:pointer;">
+                        <input type="checkbox" id="invertIndicator" style="width:auto;cursor:pointer;">
+                        Invert — indicator present means FALSE
+                    </label>
+                    <p style="color:#8b949e;font-size:11px;margin-top:6px;">
+                        Use Invert when the string shows on FALSE and disappears on TRUE
+                        (e.g. a "No results"/error message).
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label>Payload Encoding</label>
+                    <select id="encoding">
+                        <option value="none">None (raw)</option>
+                        <option value="url">URL-encode</option>
+                        <option value="double-url">Double URL-encode</option>
+                        <option value="url-plus">URL-encode (spaces as +)</option>
+                        <option value="base64">Base64</option>
+                        <option value="hex">Hex</option>
+                        <option value="unicode">Unicode escape (\\uXXXX)</option>
+                        <option value="html">HTML entities (&amp;#NN;)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" id="useTemplate" style="width:auto;cursor:pointer;" onchange="document.getElementById('templateBox').style.display=this.checked?'block':'none';">
+                        Use custom payload template
+                    </label>
+                    <div id="templateBox" style="display:none;margin-top:8px;">
+                        <input type="text" id="customTemplate" placeholder="' OR 1={1}-- -"
+                               value="' OR 1={1}-- -">
+                        <p style="color:#8b949e;font-size:11px;margin-top:6px;">
+                            <code style="color:#fb923c;">{1}</code> is where the tool drops its
+                            generated boolean condition (e.g. it becomes
+                            <code>' OR 1=((SELECT …)&gt;64)-- -</code>). The
+                            <code style="color:#fb923c;">§ §</code> request marker still controls
+                            <em>where</em> in the request this payload is placed.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Extraction Mode</label>
+                    <select id="extractionMode">
+                        <option value="tables">Get Table Names</option>
+                        <option value="columns">Get Columns (specify table)</option>
+                        <option value="data">Extract Data (specify table/column)</option>
+                        <option value="test">Test Injection Only</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="tableNameGroup" style="display: none;">
+                    <label>Table Name</label>
+                    <input type="text" id="tableName" placeholder="e.g., users, admin, accounts">
+                </div>
+
+                <div class="form-group" id="columnNameGroup" style="display: none;">
+                    <label>Column Name</label>
+                    <input type="text" id="columnName" placeholder="e.g., password, email, username">
+                </div>
+
+                <div class="form-group" id="whereClauseGroup" style="display: none;">
+                    <label>Row filter (optional)</label>
+                    <input type="text" id="whereClause" placeholder="e.g., username='administrator'">
+                    <p style="color:#8b949e;font-size:11px;margin-top:6px;">
+                        Optional. The table/column/filter are built into a self-contained
+                        condition <code>(SELECT &lt;expr&gt; FROM table WHERE filter)&gt;N</code>,
+                        so your template stays generic (e.g. <code>FROM dual</code>) — you do
+                        <strong>not</strong> repeat the table/WHERE in the template. With a
+                        filter the tool targets that one row; without it, it pages through rows.
+                    </p>
+                </div>
+
+                <div class="form-group" id="enumTablesGroup" style="display: none;">
+                    <label>Table-enumeration candidates (advanced — one per line)</label>
+                    <textarea id="enumTables" rows="3" style="font-family:monospace;font-size:12px;"
+                        placeholder="COLUMN || FROM_CLAUSE   (use {rownum} for Oracle 1-based, {row} for 0-based, {tbl} for table)"></textarea>
+                    <p style="color:#8b949e;font-size:11px;margin-top:6px;">
+                        Each line: <code>column || FROM …</code>. The tool tries them in order and
+                        keeps the first that passes validation (<code>LENGTH&gt;0</code> true and
+                        <code>LENGTH&gt;9999</code> false). Leave blank to use built-in defaults for
+                        the selected DB. Example (Oracle):<br>
+                        <code>table_name || FROM (SELECT table_name, ROWNUM rn FROM user_tables) WHERE rn={rownum}</code>
+                    </p>
+                </div>
+
+                <div class="form-group" id="enumColumnsGroup" style="display: none;">
+                    <label>Column-enumeration candidates (advanced — one per line)</label>
+                    <textarea id="enumColumns" rows="3" style="font-family:monospace;font-size:12px;"
+                        placeholder="column_name || FROM … WHERE table_name='{tbl}' … {rownum}/{row}"></textarea>
+                </div>
+
+                <div class="button-group">
+                    <button id="startBtn" onclick="startInjection()">▶ Start</button>
+                    <button class="danger" id="stopBtn" onclick="stopInjection()" style="display: none;">■ Stop</button>
+                </div>
+            </div>
+
+            <!-- Output Panel -->
+            <div class="panel output-panel" id="outputPanel">
+                <div class="panel-title">📊 Results</div>
+
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('console')">Console</div>
+                    <div class="tab" onclick="switchTab('data')">Extracted Data</div>
+                    <div class="tab" onclick="switchTab('stats')">Statistics</div>
+                </div>
+
+                <div class="tab-content active" id="consoleTab">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div id="consoleLogs"></div>
+                </div>
+
+                <div class="tab-content" id="dataTab">
+                    <div id="extractedData"></div>
+                </div>
+
+                <div class="tab-content" id="statsTab">
+                    <div id="statistics"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let injectionSocket = null;
+        let extractedResults = { tables: [], columns: [], data: [] };
+        const MARKER = "§";
+
+        // Wrap the currently selected text in the request box with § § markers.
+        function addMarker() {
+            const ta = document.getElementById('rawRequest');
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            const val = ta.value;
+            if (start === end) {
+                alert('Select the text to inject into (e.g. the TrackingId value), then click Add Marker.');
+                return;
+            }
+            // Remove any existing markers first — only one injection point allowed.
+            const cleaned = val.split(MARKER).join('');
+            // Recompute selection offsets against the cleaned string is messy if
+            // markers existed; simplest: if markers already present, clear then ask again.
+            if (cleaned !== val) {
+                ta.value = cleaned;
+                alert('Existing markers cleared. Re-select your injection point and click Add Marker again.');
+                return;
+            }
+            const selected = val.slice(start, end);
+            ta.value = val.slice(0, start) + MARKER + selected + MARKER + val.slice(end);
+        }
+
+        function clearMarkers() {
+            const ta = document.getElementById('rawRequest');
+            ta.value = ta.value.split(MARKER).join('');
+        }
+
+        // Update form visibility based on extraction mode
+        document.getElementById('extractionMode').addEventListener('change', function() {
+            const mode = this.value;
+            document.getElementById('tableNameGroup').style.display = mode === 'columns' || mode === 'data' ? 'block' : 'none';
+            document.getElementById('columnNameGroup').style.display = mode === 'data' ? 'block' : 'none';
+            document.getElementById('whereClauseGroup').style.display = mode === 'data' ? 'block' : 'none';
+            document.getElementById('enumTablesGroup').style.display = (mode === 'tables' || mode === 'columns') ? 'block' : 'none';
+            document.getElementById('enumColumnsGroup').style.display = mode === 'columns' ? 'block' : 'none';
+        });
+
+        // Switch tabs
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        // Start injection
+        async function startInjection() {
+            const raw = document.getElementById('rawRequest').value;
+            const databaseType = document.getElementById('databaseType').value;
+            const injectionType = document.getElementById('injectionType').value;
+            const trueIndicator = document.getElementById('trueIndicator').value;
+            const extractionMode = document.getElementById('extractionMode').value;
+
+            if (!raw.trim()) {
+                alert('Please paste an HTTP request');
+                return;
+            }
+
+            // Require a marker pair (§ ... §) defining the injection point.
+            if ((raw.split(MARKER).length - 1) < 2) {
+                alert('Add an injection marker: select the value to inject into and click "§ Add Marker".');
+                return;
+            }
+
+            if (!trueIndicator.trim()) {
+                alert('Please enter a true indicator');
+                return;
+            }
+
+            isRunning = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').style.display = 'block';
+            document.getElementById('outputPanel').classList.add('active');
+            document.getElementById('consoleLogs').innerHTML = '';
+            document.getElementById('extractedData').innerHTML = '';
+            document.getElementById('statistics').innerHTML = '';
+
+            const payload = {
+                raw_request: raw,
+                injection_point: "marker",
+                database_type: databaseType,
+                injection_type: injectionType,
+                true_indicator: trueIndicator,
+                extraction_mode: extractionMode,
+                table_name: document.getElementById('tableName').value,
+                column_name: document.getElementById('columnName').value,
+                where_clause: document.getElementById('whereClause').value,
+                enum_tables: document.getElementById('enumTables').value,
+                enum_columns: document.getElementById('enumColumns').value,
+                case_sensitive: document.getElementById('caseSensitive').checked,
+                invert_indicator: document.getElementById('invertIndicator').checked,
+                encoding: document.getElementById('encoding').value,
+                custom_template: document.getElementById('useTemplate').checked
+                    ? document.getElementById('customTemplate').value
+                    : null
+            };
+
+            try {
+                const response = await fetch('/blindsql-start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (data.task_id) {
+                    monitorTask(data.task_id);
+                } else {
+                    addLog('Error starting injection: ' + data.error, 'error');
+                    stopInjection();
+                }
+            } catch (error) {
+                addLog('Connection error: ' + error, 'error');
+                stopInjection();
+            }
+        }
+
+        // Monitor task progress
+        async function monitorTask(taskId) {
+            while (isRunning) {
+                try {
+                    const response = await fetch(`/blindsql-status/${taskId}`);
+                    const data = await response.json();
+
+                    // Update logs
+                    if (data.logs) {
+                        data.logs.forEach(log => {
+                            const logType = log.includes('✓') || log.includes('Found') ? 'success' :
+                                          log.includes('✗') || log.includes('Error') ? 'error' : 'info';
+                            addLog(log, logType);
+                        });
+                    }
+
+                    // Update progress
+                    if (data.progress) {
+                        document.getElementById('progressFill').style.width = (data.progress * 100) + '%';
+                    }
+
+                    // Update results
+                    if (data.results) {
+                        extractedResults = data.results;
+                        displayResults();
+                    }
+
+                    if (data.status === 'completed' || data.status === 'error') {
+                        stopInjection();
+                    }
+
+                    await new Promise(r => setTimeout(r, 500));
+                } catch (error) {
+                    console.error('Monitor error:', error);
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+        }
+
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('consoleLogs');
+            const line = document.createElement('div');
+            line.className = 'log-line ' + type;
+            line.textContent = message;
+            logsDiv.appendChild(line);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function displayResults() {
+            // Display extracted data
+            let dataHtml = '';
+            if (extractedResults.tables && extractedResults.tables.length > 0) {
+                dataHtml += '<div class="extraction-result"><span class="key">Tables:</span> ' +
+                           extractedResults.tables.join(', ') + '</div>';
+            }
+            if (extractedResults.columns && extractedResults.columns.length > 0) {
+                dataHtml += '<div class="extraction-result"><span class="key">Columns:</span> ' +
+                           extractedResults.columns.join(', ') + '</div>';
+            }
+            if (extractedResults.data && extractedResults.data.length > 0) {
+                extractedResults.data.forEach((item, i) => {
+                    dataHtml += `<div class="extraction-result"><span class="key">[${i}]</span> <span class="value">${item}</span></div>`;
+                });
+            }
+
+            document.getElementById('extractedData').innerHTML = dataHtml || '<p style="color: #8b949e;">No data extracted yet...</p>';
+
+            // Display statistics
+            let statsHtml = `
+                <div class="stat-box">
+                    <div class="stat-label">Tables Found</div>
+                    <div class="stat-value">${(extractedResults.tables || []).length}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Columns Found</div>
+                    <div class="stat-value">${(extractedResults.columns || []).length}</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Data Extracted</div>
+                    <div class="stat-value">${(extractedResults.data || []).length}</div>
+                </div>
+            `;
+            document.getElementById('statistics').innerHTML = statsHtml;
+        }
+
+        function stopInjection() {
+            isRunning = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').style.display = 'none';
+            addLog('Injection stopped', 'info');
+        }
+    </script>
+</body>
+</html>

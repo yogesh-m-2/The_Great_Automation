@@ -12,10 +12,31 @@ import requests as req_lib
 from requests.exceptions import RequestException
 import subprocess as _sp
 
+# ── Extracted modules ─────────────────────────────────────────────────────────
+import storage
+from storage import (
+    TASKS_FILE, FIELDNAMES,
+    load_tasks, save_tasks, get_task, update_task_fields,
+)
+# Keep the original private-looking names as aliases so existing call sites in
+# this file remain byte-for-byte unchanged.
+_runtime_get = storage.runtime_get
+_runtime_set = storage.runtime_set
+from tasks import MyThread
+from tools import tools_bp
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
+app.register_blueprint(tools_bp)
 
-TASKS_FILE = "tasks.csv"
+# Blind SQL injection tool (optional — needs blindsql.py present).
+try:
+    from blindsql_routes import blindsql_bp
+    app.register_blueprint(blindsql_bp)
+    _BLINDSQL_AVAILABLE = True
+except Exception as _e:
+    print(f"[blindsql] not loaded: {_e}")
+    _BLINDSQL_AVAILABLE = False
 
 # ─── Pure-TCP intercepting proxy (no mitmproxy) ───────────────────────────────
 _proxy_lock    = threading.Lock()
@@ -578,174 +599,8 @@ def _launch_browser(host, port):
 
     threading.Thread(target=_run, daemon=True).start()
 
-FIELDNAMES = ["id", "name", "status", "progress", "total", "speed", "code", "cpu_usage"]
-
-# ─── In-memory runtime state ─────────────────────────────────────────────────
-# Holds live data for running tasks so we avoid CSV reads/writes in hot paths.
-# Structure: { task_id: { "progress": int, "total": int, "speed": int,
-#                         "status": str, "semaphore": threading.Semaphore } }
-_runtime = {}
-_runtime_lock = threading.Lock()
-
-
-def _runtime_get(task_id, key, default=None):
-    with _runtime_lock:
-        return _runtime.get(task_id, {}).get(key, default)
-
-
-def _runtime_set(task_id, key, value):
-    with _runtime_lock:
-        if task_id not in _runtime:
-            _runtime[task_id] = {}
-        _runtime[task_id][key] = value
-
-
-# ─── CSV helpers ─────────────────────────────────────────────────────────────
-_csv_lock = threading.Lock()
-
-
-def load_tasks():
-    tasks = []
-    if not os.path.exists(TASKS_FILE):
-        return tasks
-    with _csv_lock:
-        with open(TASKS_FILE, "r", newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                tasks.append(row)
-    return tasks
-
-
-def save_tasks(tasks):
-    with _csv_lock:
-        with open(TASKS_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            writer.writerows(tasks)
-
-
-def get_task(task_id):
-    for t in load_tasks():
-        if int(t["id"]) == task_id:
-            return t
-    return None
-
-
-def update_task_fields(task_id, **fields):
-    """Update specific fields of a task in the CSV atomically."""
-    with _csv_lock:
-        tasks = []
-        if os.path.exists(TASKS_FILE):
-            with open(TASKS_FILE, "r", newline="", encoding="utf-8") as f:
-                tasks = list(csv.DictReader(f))
-        for t in tasks:
-            if int(t["id"]) == task_id:
-                t.update({k: v for k, v in fields.items()})
-        with open(TASKS_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            writer.writerows(tasks)
-
-
-# ─── Thread class ─────────────────────────────────────────────────────────────
-
-class MyThread(threading.Thread):
-    def __init__(self, task_id, code, speed):
-        super().__init__()
-        self.task_id = task_id
-        self.stop_event = threading.Event()
-        self.code = code
-        self.daemon = True
-
-        # Build semaphore for speed control
-        speed = max(1, int(speed))
-        sem = threading.Semaphore(speed)
-        with _runtime_lock:
-            _runtime[task_id] = {
-                "speed": speed,
-                "semaphore": sem,
-                "status": "Running",
-            }
-
-    def run(self):
-        final_status = "Stopped"
-        try:
-            exec(self.code, {"stop_event": self.stop_event, "task": self})
-            # If we get here without stop_event being set, task completed
-            if not self.stop_event.is_set():
-                final_status = "Done"
-        except Exception as e:
-            print(f"[Task {self.task_id}] Error: {e}")
-            final_status = "Error"
-        finally:
-            _runtime_set(self.task_id, "status", final_status)
-            # Persist final state to CSV
-            progress = _runtime_get(self.task_id, "progress", 0)
-            total = _runtime_get(self.task_id, "total", 1)
-            update_task_fields(self.task_id, status=final_status,
-                               progress=progress, total=total)
-
-    # ── methods callable from exec'd code ────────────────────────────────────
-
-    def get_speed(self):
-        """Return current speed from in-memory state — no CSV read."""
-        return str(_runtime_get(self.task_id, "speed", 1))
-
-    def change_speed(self, new_speed):
-        new_speed = max(1, int(new_speed))
-        with _runtime_lock:
-            state = _runtime.get(self.task_id, {})
-            old_speed = state.get("speed", 1)
-            state["speed"] = new_speed
-            sem = state.get("semaphore")
-            if sem is not None:
-                diff = new_speed - old_speed
-                if diff > 0:
-                    # Allow more concurrent threads
-                    for _ in range(diff):
-                        sem.release()
-                # If reducing speed, existing threads finish naturally;
-                # new ones will be blocked by the semaphore count.
-                # We adjust the internal counter carefully:
-                elif diff < 0:
-                    # Drain excess permits (non-blocking)
-                    for _ in range(-diff):
-                        sem.acquire(blocking=False)
-
-    def load_progress(self):
-        """Return saved progress from CSV (used only at task start)."""
-        t = get_task(self.task_id)
-        return t["progress"] if t else "0"
-
-    def save_progress(self, progress):
-        """Update progress in memory only; flush to CSV periodically."""
-        _runtime_set(self.task_id, "progress", progress)
-        # Persist every 5 saves to reduce CSV I/O
-        with _runtime_lock:
-            state = _runtime.get(self.task_id, {})
-            count = state.get("_save_counter", 0) + 1
-            state["_save_counter"] = count
-            if count % 5 == 0:
-                update_task_fields(self.task_id, progress=progress)
-
-    def update_total_batch(self, total):
-        _runtime_set(self.task_id, "total", total)
-        update_task_fields(self.task_id, total=total)
-
-    def acquire_slot(self):
-        """Worker threads call this instead of the busy-wait loop."""
-        sem = _runtime_get(self.task_id, "semaphore")
-        if sem:
-            sem.acquire()
-
-    def release_slot(self):
-        """Worker threads call this when done."""
-        sem = _runtime_get(self.task_id, "semaphore")
-        if sem:
-            sem.release()
-
-    def stop(self):
-        self.stop_event.set()
+# Task persistence, runtime state, and the MyThread worker live in
+# storage.py and tasks.py (imported above).
 
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -819,8 +674,8 @@ def delete_task(task_id):
         if isinstance(thread, MyThread) and thread.task_id == task_id:
             thread.stop()
     # Remove from runtime state
-    with _runtime_lock:
-        _runtime.pop(task_id, None)
+    with storage._runtime_lock:
+        storage._runtime.pop(task_id, None)
     tasks = [t for t in load_tasks() if int(t["id"]) != task_id]
     save_tasks(tasks)
     outfile = f"file_{task_id}"
@@ -837,8 +692,8 @@ def restart_task(task_id):
     for thread in threading.enumerate():
         if isinstance(thread, MyThread) and thread.task_id == task_id:
             thread.stop()
-    with _runtime_lock:
-        _runtime.pop(task_id, None)
+    with storage._runtime_lock:
+        storage._runtime.pop(task_id, None)
     update_task_fields(task_id, progress=0, status="Stopped")
     outfile = f"file_{task_id}"
     if os.path.exists(outfile):
@@ -1000,7 +855,7 @@ def task_status():
     for t in tasks:
         task_id = int(t["id"])
         # Prefer live in-memory values if the task is running
-        live = _runtime.get(task_id, {})
+        live = storage._runtime.get(task_id, {})
         progress = live.get("progress", int(t.get("progress", 0)))
         total = live.get("total", max(int(t.get("total", 1)), 1))
         speed = live.get("speed", t["speed"])
@@ -1017,89 +872,8 @@ def task_status():
 
 
 # ─── Tool routes ──────────────────────────────────────────────────────────────
-
-def _create_tool_task(name, code, speed):
-    """Helper to append a tool task to the CSV and redirect."""
-    tasks = load_tasks()
-    ids = [int(t["id"]) for t in tasks]
-    new_id = max(ids) + 1 if ids else 1
-    tasks.append({
-        "id": str(new_id), "name": name, "status": "Stopped",
-        "progress": 0, "total": 1, "speed": speed, "code": code, "cpu_usage": ""
-    })
-    save_tasks(tasks)
-    return redirect(url_for("dashboard"))
-
-
-@app.route("/nmap", methods=["POST"])
-def nmap():
-    if "username" not in session:
-        return redirect(url_for("signin"))
-    ip = request.form.get("ip", "").strip()
-    if not ip:
-        return redirect(url_for("dashboard"))
-    all_ports = request.form.get("all_ports")
-    start_port = request.form.get("start_port", "0").strip()
-    end_port = request.form.get("end_port", "1024").strip()
-
-    with open("nmap", "r") as f:
-        code = f.read()
-
-    if all_ports:
-        code = code.replace("start_range", "0").replace("end_range", "65535")
-        speed = 500
-    else:
-        code = code.replace("start_range", start_port).replace("end_range", end_port)
-        speed = 100
-
-    # Use repr() to safely embed the IP string
-    code = code.replace('"ip_goes_here"', repr(ip))
-    return _create_tool_task(f"nmap_{ip}", code, speed)
-
-
-@app.route("/dirbuster", methods=["POST"])
-def dirbuster():
-    if "username" not in session:
-        return redirect(url_for("signin"))
-    data = request.get_json()
-    url = data.get("url", "").strip()
-    status_codes = data.get("excludedstatuscodes", [])
-
-    with open("dirbuster", "r") as f:
-        code = f.read()
-
-    code = code.replace('"url_goes_here"', repr(url))
-    code = code.replace("array_status_code", repr(status_codes))
-    return _create_tool_task(f"dirbuster_{url}", code, 500)
-
-
-@app.route("/httpx", methods=["POST"])
-def httpx():
-    if "username" not in session:
-        return redirect(url_for("signin"))
-    data = request.get_json()
-    targets = data.get("targets", "").strip()
-
-    with open("httpx", "r") as f:
-        code = f.read()
-
-    # targets is a multiline string — embed safely
-    code = code.replace('"""targets_goes_here"""', repr(targets))
-    return _create_tool_task("httpx_probe", code, 100)
-
-
-@app.route("/subfinder", methods=["POST"])
-def subfinder():
-    if "username" not in session:
-        return redirect(url_for("signin"))
-    data = request.get_json()
-    domain = data.get("domain", "").strip()
-
-    with open("subfinder", "r") as f:
-        code = f.read()
-
-    code = code.replace('"domain_goes_here"', repr(domain))
-    return _create_tool_task(f"subfinder_{domain}", code, 50)
+# nmap / dirbuster / httpx / subfinder routes live in tools.py (registered as a
+# Blueprint above).
 
 
 import socket

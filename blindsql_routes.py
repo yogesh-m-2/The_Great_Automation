@@ -120,6 +120,8 @@ def blindsql_start():
                 where_clause=data.get("where_clause") or None,
                 enum_tables_override=_parse_candidates(data.get("enum_tables")),
                 enum_columns_override=_parse_candidates(data.get("enum_columns")),
+                threads=data.get("threads", 1),
+                time_delay=data.get("time_delay", 5),
             )
 
             # Confirm injection with a TRUE/FALSE differential test. A real blind
